@@ -1,0 +1,321 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("MONGO_URI")
+}
+
+model User {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  name      String
+  email     String   @unique
+  password  String
+  role      String   @default("staff")
+  status    String   @default("active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  billsCreated     Bill[]                @relation("BillCreatedBy")
+  samplesCollected Sample[]              @relation("SampleCollectedBy")
+  samplesRejected  Sample[]              @relation("SampleRejectedBy")
+  sampleStatusLogs SampleStatusHistory[] @relation("SampleStatusChangedBy")
+  reportsPrepared  LabReport[]           @relation("ReportPreparedBy")
+  reportsApproved  LabReport[]           @relation("ReportApprovedBy")
+
+  @@map("users")
+}
+
+model Patient {
+  id          String    @id @default(auto()) @map("_id") @db.ObjectId
+  patientNo   String?   @unique @map("patient_no")
+  name        String
+  mobile      String?
+  email       String?
+  gender      String?
+  dateOfBirth DateTime? @map("date_of_birth")
+  age            Int?
+  address        String?
+  referringDoctor String?  @map("referring_doctor")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  bills   Bill[]
+  samples Sample[]
+  reports LabReport[]
+
+  @@index([mobile])
+  @@index([name])
+  @@map("patients")
+}
+
+model TestCategory {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  name        String
+  code        String   @unique
+  description String?
+  status      String   @default("active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  labTests LabTest[]
+
+  @@index([status])
+  @@map("test_categories")
+}
+
+model LabTest {
+  id             String   @id @default(auto()) @map("_id") @db.ObjectId
+  testCategoryId String   @map("test_category_id") @db.ObjectId
+  name           String
+  code           String   @unique
+  sampleType     String   @map("sample_type")
+  reportType     String   @default("single") @map("report_type")
+  unit           String?
+  price          Float    @default(0)
+  method         String?
+  defaultValue   String?  @map("default_value")
+  referenceRange String?  @map("reference_range")
+  minValue       Float?   @map("min_value")
+  maxValue       Float?   @map("max_value")
+  sortOrder      Int      @default(0) @map("sort_order")
+  status         String   @default("active")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  category       TestCategory      @relation(fields: [testCategoryId], references: [id], onDelete: Cascade)
+  parameters     TestParameter[]
+  profileItems   ProfileTestItem[]
+  billTests      BillTest[]
+  sampleTests    SampleTest[]
+  labReportTests LabReportTest[]
+
+  @@index([testCategoryId])
+  @@index([status])
+  @@index([sampleType])
+  @@map("lab_tests")
+}
+
+model TestParameter {
+  id             String   @id @default(auto()) @map("_id") @db.ObjectId
+  labTestId      String   @map("lab_test_id") @db.ObjectId
+  name           String
+  unit           String?
+  referenceRange String?  @map("reference_range")
+  minValue       Float?   @map("min_value")
+  maxValue       Float?   @map("max_value")
+  method         String?
+  sortOrder      Int      @default(0) @map("sort_order")
+  status         String   @default("active")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  labTest LabTest @relation(fields: [labTestId], references: [id], onDelete: Cascade)
+
+  @@index([labTestId])
+  @@index([status])
+  @@map("test_parameters")
+}
+
+model Profile {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  name        String
+  code        String   @unique
+  price       Float    @default(0)
+  description String?
+  status      String   @default("active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  items          ProfileTestItem[]
+  billTests      BillTest[]
+  labReportTests LabReportTest[]
+
+  @@index([status])
+  @@map("profiles")
+}
+
+model ProfileTestItem {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  profileId String   @map("profile_id") @db.ObjectId
+  labTestId String   @map("lab_test_id") @db.ObjectId
+  sortOrder Int      @default(0) @map("sort_order")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  labTest LabTest @relation(fields: [labTestId], references: [id], onDelete: Cascade)
+
+  @@unique([profileId, labTestId])
+  @@index([profileId])
+  @@index([labTestId])
+  @@map("profile_test_items")
+}
+
+model Bill {
+  id             String   @id @default(auto()) @map("_id") @db.ObjectId
+  billNo         String   @unique @map("bill_no")
+  patientId      String   @map("patient_id") @db.ObjectId
+  referredDoctor String?  @map("referred_doctor")
+  totalAmount    Float    @default(0) @map("total_amount")
+  paymentStatus  String   @default("Unpaid") @map("payment_status")
+  status         String   @default("open")
+  billDate       DateTime @default(now()) @map("bill_date")
+  createdById    String?  @map("created_by") @db.ObjectId
+  remarks        String?
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  patient   Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  createdBy User?   @relation("BillCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  billTests BillTest[]
+  samples   Sample[]
+  reports   LabReport[]
+
+  @@index([patientId])
+  @@index([status])
+  @@map("bills")
+}
+
+model BillTest {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  billId    String   @map("bill_id") @db.ObjectId
+  labTestId String?  @map("lab_test_id") @db.ObjectId
+  profileId String?  @map("profile_id") @db.ObjectId
+  testName  String   @map("test_name")
+  price     Float    @default(0)
+  status    String   @default("Pending Sample")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  bill        Bill         @relation(fields: [billId], references: [id], onDelete: Cascade)
+  labTest     LabTest?     @relation(fields: [labTestId], references: [id], onDelete: SetNull)
+  profile     Profile?     @relation(fields: [profileId], references: [id], onDelete: SetNull)
+  sampleTests SampleTest[]
+
+  @@index([billId])
+  @@index([labTestId])
+  @@index([status])
+  @@map("bill_tests")
+}
+
+model Sample {
+  id              String    @id @default(auto()) @map("_id") @db.ObjectId
+  billId          String    @map("bill_id") @db.ObjectId
+  patientId       String    @map("patient_id") @db.ObjectId
+  sampleNo        String    @unique @map("sample_no")
+  barcode         String    @unique
+  sampleType      String    @map("sample_type")
+  status          String    @default("pending")
+  collectedById   String?   @map("collected_by") @db.ObjectId
+  collectedAt     DateTime? @map("collected_at")
+  rejectedById    String?   @map("rejected_by") @db.ObjectId
+  rejectedAt      DateTime? @map("rejected_at")
+  rejectionReason String?   @map("rejection_reason")
+  remarks         String?
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  bill          Bill                  @relation(fields: [billId], references: [id], onDelete: Cascade)
+  patient       Patient               @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  collectedBy   User?                 @relation("SampleCollectedBy", fields: [collectedById], references: [id], onDelete: SetNull)
+  rejectedBy    User?                 @relation("SampleRejectedBy", fields: [rejectedById], references: [id], onDelete: SetNull)
+  sampleTests   SampleTest[]
+  statusHistory SampleStatusHistory[]
+
+  @@index([billId])
+  @@index([patientId])
+  @@index([status])
+  @@index([sampleType])
+  @@map("samples")
+}
+
+model SampleTest {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  sampleId   String   @map("sample_id") @db.ObjectId
+  billTestId String   @map("bill_test_id") @db.ObjectId
+  labTestId  String   @map("lab_test_id") @db.ObjectId
+  status     String   @default("pending")
+  remarks    String?
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  sample   Sample   @relation(fields: [sampleId], references: [id], onDelete: Cascade)
+  billTest BillTest @relation(fields: [billTestId], references: [id], onDelete: Cascade)
+  labTest  LabTest  @relation(fields: [labTestId], references: [id], onDelete: Cascade)
+
+  @@index([sampleId])
+  @@index([billTestId])
+  @@index([labTestId])
+  @@index([status])
+  @@map("sample_tests")
+}
+
+model SampleStatusHistory {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  sampleId    String   @map("sample_id") @db.ObjectId
+  status      String
+  remarks     String?
+  changedById String?  @map("changed_by") @db.ObjectId
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  sample    Sample @relation(fields: [sampleId], references: [id], onDelete: Cascade)
+  changedBy User?  @relation("SampleStatusChangedBy", fields: [changedById], references: [id], onDelete: SetNull)
+
+  @@index([sampleId])
+  @@map("sample_status_histories")
+}
+
+model LabReport {
+  id           String    @id @default(auto()) @map("_id") @db.ObjectId
+  billId       String    @map("bill_id") @db.ObjectId
+  patientId    String    @map("patient_id") @db.ObjectId
+  reportNo     String    @unique @map("report_no")
+  qrCode       String?   @map("qr_code")
+  status       String    @default("draft")
+  preparedById String?   @map("prepared_by") @db.ObjectId
+  approvedById String?   @map("approved_by") @db.ObjectId
+  preparedAt   DateTime? @map("prepared_at")
+  approvedAt   DateTime? @map("approved_at")
+  pdfPath      String?   @map("pdf_path")
+  remarks      String?
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  bill        Bill            @relation(fields: [billId], references: [id], onDelete: Cascade)
+  patient     Patient         @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  preparedBy  User?           @relation("ReportPreparedBy", fields: [preparedById], references: [id], onDelete: SetNull)
+  approvedBy  User?           @relation("ReportApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+  reportTests LabReportTest[]
+
+  @@index([billId])
+  @@index([patientId])
+  @@index([status])
+  @@map("lab_reports")
+}
+
+model LabReportTest {
+  id             String   @id @default(auto()) @map("_id") @db.ObjectId
+  labReportId    String   @map("lab_report_id") @db.ObjectId
+  labTestId      String?  @map("lab_test_id") @db.ObjectId
+  profileId      String?  @map("profile_id") @db.ObjectId
+  testName       String   @map("test_name")
+  resultValue    String?  @map("result_value")
+  unit           String?
+  referenceRange String?  @map("reference_range")
+  flag           String?
+  method         String?
+  remarks        String?
+  sortOrder      Int      @default(0) @map("sort_order")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  labReport LabReport @relation(fields: [labReportId], references: [id], onDelete: Cascade)
+  labTest   LabTest?  @relation(fields: [labTestId], references: [id], onDelete: SetNull)
+  profile   Profile?  @relation(fields: [profileId], references: [id], onDelete: SetNull)
+
+  @@index([labReportId])
+  @@index([labTestId])
+  @@map("lab_report_tests")
+}
