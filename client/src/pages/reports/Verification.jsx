@@ -3,8 +3,7 @@ import { useParams } from 'react-router-dom';
 import { Card } from 'primereact/card';
 import { Tag } from 'primereact/tag';
 import axios from 'axios';
-
-const api = axios.create({ baseURL: '' });
+import { apiUrl } from '../../config/api';
 
 export default function ReportVerification() {
     const { reportNo } = useParams();
@@ -12,7 +11,7 @@ export default function ReportVerification() {
     const [error, setError] = useState(null);
 
     useEffect(() => {
-        api.get(`/report/verify/${reportNo}`)
+        axios.get(apiUrl(`/report/verify/${reportNo}`))
             .then((res) => setData(res.data.data))
             .catch((e) => setError(e.response?.data?.message || 'Report not found'));
     }, [reportNo]);

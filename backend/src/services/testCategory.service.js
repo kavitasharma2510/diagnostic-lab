@@ -1,6 +1,6 @@
 import prisma from '../lib/prisma.js';
 import { AppError } from '../middleware/errorHandler.js';
-import { buildPagination, paginatedResponse } from '../utils/pagination.js';
+import { buildPagination, paginatedResponse, paginatedList } from '../utils/pagination.js';
 import { serialize } from '../utils/serialize.js';
 import { parseId } from '../utils/parseId.js';
 
@@ -20,7 +20,7 @@ export const testCategoryService = {
             where.status = filters.status;
         }
 
-        const [total, rows] = await prisma.$transaction([
+        const [total, rows] = await paginatedList(
             prisma.testCategory.count({ where }),
             prisma.testCategory.findMany({
                 where,
@@ -29,7 +29,7 @@ export const testCategoryService = {
                 orderBy: { name: 'asc' },
                 include: { _count: { select: { labTests: true } } },
             }),
-        ]);
+        );
 
         const data = rows.map((row) => ({
             ...serialize(row),

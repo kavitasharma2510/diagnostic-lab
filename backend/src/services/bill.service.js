@@ -1,6 +1,6 @@
 import prisma from '../lib/prisma.js';
 import { AppError } from '../middleware/errorHandler.js';
-import { buildPagination, paginatedResponse } from '../utils/pagination.js';
+import { buildPagination, paginatedResponse, paginatedList } from '../utils/pagination.js';
 import { serialize } from '../utils/serialize.js';
 import { parseId } from '../utils/parseId.js';
 import { BILL_TEST_STATUS } from '../utils/billTestStatus.js';
@@ -32,11 +32,11 @@ function mapBill(row) {
     });
 }
 
-async function generateBillNo(tx) {
+async function generateBillNo(db = prisma) {
     const today = new Date();
     const prefix = `BILL-${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`;
 
-    const last = await tx.bill.findFirst({
+    const last = await db.bill.findFirst({
         where: { billNo: { startsWith: prefix } },
         orderBy: { billNo: 'desc' },
     });
@@ -126,7 +126,7 @@ export const billService = {
             ];
         }
 
-        const [total, rows] = await prisma.$transaction([
+        const [total, rows] = await paginatedList(
             prisma.bill.count({ where }),
             prisma.bill.findMany({
                 where,
@@ -138,7 +138,7 @@ export const billService = {
                     _count: { select: { billTests: true } },
                 },
             }),
-        ]);
+        );
 
         return paginatedResponse(rows.map(mapBill), total, currentPage, limit);
     },
@@ -169,33 +169,30 @@ export const billService = {
         const lineItems = await expandBillLineItems(data.lab_test_ids, data.profile_ids);
         const totalAmount = lineItems.reduce((sum, item) => sum + Number(item.price || 0), 0);
 
-        const bill = await prisma.$transaction(async (tx) => {
-            const billNo = await generateBillNo(tx);
-
-            return tx.bill.create({
-                data: {
-                    billNo,
-                    patientId: patient.id,
-                    referredDoctor: data.referred_doctor ?? patient.referringDoctor ?? null,
-                    totalAmount,
-                    paymentStatus: data.payment_status || 'Unpaid',
-                    status: 'open',
-                    remarks: data.remarks ?? null,
-                    billTests: {
-                        create: lineItems.map((item) => ({
-                            labTestId: item.labTestId,
-                            profileId: item.profileId,
-                            testName: item.testName,
-                            price: item.price,
-                            status: BILL_TEST_STATUS.PENDING_SAMPLE,
-                        })),
-                    },
+        const billNo = await generateBillNo();
+        const bill = await prisma.bill.create({
+            data: {
+                billNo,
+                patientId: patient.id,
+                referredDoctor: data.referred_doctor ?? patient.referringDoctor ?? null,
+                totalAmount,
+                paymentStatus: data.payment_status || 'Unpaid',
+                status: 'open',
+                remarks: data.remarks ?? null,
+                billTests: {
+                    create: lineItems.map((item) => ({
+                        labTestId: item.labTestId,
+                        profileId: item.profileId,
+                        testName: item.testName,
+                        price: item.price,
+                        status: BILL_TEST_STATUS.PENDING_SAMPLE,
+                    })),
                 },
-                include: {
-                    patient: true,
-                    billTests: { include: { labTest: true, profile: true } },
-                },
-            });
+            },
+            include: {
+                patient: true,
+                billTests: { include: { labTest: true, profile: true } },
+            },
         });
 
         return mapBill(bill);

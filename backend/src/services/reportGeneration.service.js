@@ -3,7 +3,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import prisma from '../lib/prisma.js';
 import { AppError } from '../middleware/errorHandler.js';
-import { buildPagination, paginatedResponse } from '../utils/pagination.js';
+import { buildPagination, paginatedResponse, paginatedList } from '../utils/pagination.js';
 import { serialize } from '../utils/serialize.js';
 import { parseId } from '../utils/parseId.js';
 import { detectFlag } from '../utils/flagDetector.js';
@@ -60,11 +60,11 @@ function mapReport(report) {
     });
 }
 
-async function generateReportNo(tx) {
+async function generateReportNo(db = prisma) {
     const today = new Date();
     const prefix = `RPT-${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`;
 
-    const last = await tx.labReport.findFirst({
+    const last = await db.labReport.findFirst({
         where: { reportNo: { startsWith: prefix } },
         orderBy: { reportNo: 'desc' },
     });
@@ -146,7 +146,7 @@ export const reportGenerationService = {
             ];
         }
 
-        const [total, rows] = await prisma.$transaction([
+        const [total, rows] = await paginatedList(
             prisma.labReport.count({ where }),
             prisma.labReport.findMany({
                 where,
@@ -161,7 +161,7 @@ export const reportGenerationService = {
                     _count: { select: { reportTests: true } },
                 },
             }),
-        ]);
+        );
 
         const data = rows.map((r) => mapReport(r));
         return paginatedResponse(data, total, currentPage, limit);
@@ -200,65 +200,63 @@ export const reportGenerationService = {
     },
 
     async generate(billId, preparedById = null) {
-        return prisma.$transaction(async (tx) => {
-            const bill = await tx.bill.findUnique({
-                where: { id: parseId(billId) },
-                include: {
-                    patient: true,
-                    billTests: {
-                        where: { status: { in: ['collected', 'completed'] } },
-                        include: {
-                            labTest: {
-                                include: {
-                                    parameters: { where: { status: 'active' }, orderBy: { sortOrder: 'asc' } },
-                                },
+        const bill = await prisma.bill.findUnique({
+            where: { id: parseId(billId) },
+            include: {
+                patient: true,
+                billTests: {
+                    where: { status: { in: ['collected', 'completed'] } },
+                    include: {
+                        labTest: {
+                            include: {
+                                parameters: { where: { status: 'active' }, orderBy: { sortOrder: 'asc' } },
                             },
                         },
                     },
-                    reports: { where: { status: { in: ['draft', 'generated', 'approved'] } } },
                 },
-            });
-
-            if (!bill) throw new AppError('Bill not found', 404);
-            if (!bill.billTests.length) {
-                throw new AppError('No collected tests found for this bill.', 422);
-            }
-            if (bill.reports.length) {
-                throw new AppError('A report already exists for this bill.', 422);
-            }
-
-            const reportNo = await generateReportNo(tx);
-            const verifyUrl = `${labConfig().appUrl}/report/verify/${reportNo}`;
-
-            const report = await tx.labReport.create({
-                data: {
-                    billId: bill.id,
-                    patientId: bill.patientId,
-                    reportNo,
-                    qrCode: verifyUrl,
-                    status: 'draft',
-                    preparedById: preparedById || null,
-                    preparedAt: new Date(),
-                    reportTests: {
-                        create: buildTestRows(bill.billTests).map((row) => ({
-                            labTestId: row.labTestId,
-                            profileId: row.profileId,
-                            testName: row.testName,
-                            unit: row.unit,
-                            referenceRange: row.referenceRange,
-                            method: row.method,
-                            sortOrder: row.sortOrder,
-                        })),
-                    },
-                },
-            });
-
-            return this.getById(report.id, tx);
+                reports: { where: { status: { in: ['draft', 'generated', 'approved'] } } },
+            },
         });
+
+        if (!bill) throw new AppError('Bill not found', 404);
+        if (!bill.billTests.length) {
+            throw new AppError('No collected tests found for this bill.', 422);
+        }
+        if (bill.reports.length) {
+            throw new AppError('A report already exists for this bill.', 422);
+        }
+
+        const reportNo = await generateReportNo();
+        const verifyUrl = `${labConfig().appUrl}/report/verify/${reportNo}`;
+
+        const report = await prisma.labReport.create({
+            data: {
+                billId: bill.id,
+                patientId: bill.patientId,
+                reportNo,
+                qrCode: verifyUrl,
+                status: 'draft',
+                preparedById: preparedById || null,
+                preparedAt: new Date(),
+                reportTests: {
+                    create: buildTestRows(bill.billTests).map((row) => ({
+                        labTestId: row.labTestId,
+                        profileId: row.profileId,
+                        testName: row.testName,
+                        unit: row.unit,
+                        referenceRange: row.referenceRange,
+                        method: row.method,
+                        sortOrder: row.sortOrder,
+                    })),
+                },
+            },
+        });
+
+        return this.getById(report.id);
     },
 
-    async getById(id, tx = prisma) {
-        const report = await tx.labReport.findUnique({
+    async getById(id) {
+        const report = await prisma.labReport.findUnique({
             where: { id: parseId(id) },
             include: reportInclude,
         });
@@ -292,101 +290,97 @@ export const reportGenerationService = {
     async saveResults(id, data) {
         const { results, remarks, prepared_by_id } = data;
 
-        return prisma.$transaction(async (tx) => {
-            const report = await tx.labReport.findUnique({
-                where: { id: parseId(id) },
-                include: { reportTests: true },
-            });
-
-            if (!report) throw new AppError('Report not found', 404);
-            if (report.status === 'approved') {
-                throw new AppError('Approved reports cannot be edited.', 422);
-            }
-
-            const testMap = Object.fromEntries(report.reportTests.map((rt) => [rt.id, rt]));
-
-            const labTests = await tx.labTest.findMany({
-                where: {
-                    id: { in: [...new Set(report.reportTests.map((r) => r.labTestId).filter(Boolean))] },
-                },
-                include: { parameters: true },
-            });
-            const labTestMap = Object.fromEntries(labTests.map((lt) => [lt.id, lt]));
-
-            for (const item of results) {
-                const existing = testMap[item.id];
-                if (!existing) continue;
-
-                const labTest = existing.labTestId ? labTestMap[existing.labTestId] : null;
-                const param = labTest?.parameters?.find((p) => p.name === existing.testName);
-                const minValue = item.min_value ?? param?.minValue ?? labTest?.minValue;
-                const maxValue = item.max_value ?? param?.maxValue ?? labTest?.maxValue;
-                const flag = detectFlag(item.result_value, minValue, maxValue);
-
-                await tx.labReportTest.update({
-                    where: { id: item.id },
-                    data: {
-                        resultValue: item.result_value ?? null,
-                        remarks: item.remarks ?? existing.remarks,
-                        flag,
-                    },
-                });
-            }
-
-            await tx.labReport.update({
-                where: { id: parseId(id) },
-                data: {
-                    remarks: remarks ?? report.remarks,
-                    preparedById: prepared_by_id ?? report.preparedById,
-                    preparedAt: new Date(),
-                    status: 'draft',
-                },
-            });
-
-            return this.getById(id, tx);
+        const report = await prisma.labReport.findUnique({
+            where: { id: parseId(id) },
+            include: { reportTests: true },
         });
+
+        if (!report) throw new AppError('Report not found', 404);
+        if (report.status === 'approved') {
+            throw new AppError('Approved reports cannot be edited.', 422);
+        }
+
+        const testMap = Object.fromEntries(report.reportTests.map((rt) => [rt.id, rt]));
+
+        const labTests = await prisma.labTest.findMany({
+            where: {
+                id: { in: [...new Set(report.reportTests.map((r) => r.labTestId).filter(Boolean))] },
+            },
+            include: { parameters: true },
+        });
+        const labTestMap = Object.fromEntries(labTests.map((lt) => [lt.id, lt]));
+
+        for (const item of results) {
+            const existing = testMap[item.id];
+            if (!existing) continue;
+
+            const labTest = existing.labTestId ? labTestMap[existing.labTestId] : null;
+            const param = labTest?.parameters?.find((p) => p.name === existing.testName);
+            const minValue = item.min_value ?? param?.minValue ?? labTest?.minValue;
+            const maxValue = item.max_value ?? param?.maxValue ?? labTest?.maxValue;
+            const flag = detectFlag(item.result_value, minValue, maxValue);
+
+            await prisma.labReportTest.update({
+                where: { id: item.id },
+                data: {
+                    resultValue: item.result_value ?? null,
+                    remarks: item.remarks ?? existing.remarks,
+                    flag,
+                },
+            });
+        }
+
+        await prisma.labReport.update({
+            where: { id: parseId(id) },
+            data: {
+                remarks: remarks ?? report.remarks,
+                preparedById: prepared_by_id ?? report.preparedById,
+                preparedAt: new Date(),
+                status: 'draft',
+            },
+        });
+
+        return this.getById(id);
     },
 
     async approve(id, approvedById = null) {
-        return prisma.$transaction(async (tx) => {
-            const report = await tx.labReport.findUnique({
-                where: { id: parseId(id) },
-                include: reportInclude,
-            });
-
-            if (!report) throw new AppError('Report not found', 404);
-
-            const emptyResults = report.reportTests.filter((rt) => !rt.resultValue?.trim());
-            if (emptyResults.length) {
-                throw new AppError('Enter all test results before approval.', 422, {
-                    missing: emptyResults.map((r) => r.testName),
-                });
-            }
-
-            const samples = await tx.sample.findMany({
-                where: { billId: report.billId, status: { in: ['collected', 'processing', 'completed'] } },
-                orderBy: { collectedAt: 'asc' },
-            });
-
-            const pdfPath = await generateReportPdf(report, samples);
-
-            await tx.labReport.update({
-                where: { id: parseId(id) },
-                data: {
-                    status: 'approved',
-                    approvedById: approvedById || null,
-                    approvedAt: new Date(),
-                    pdfPath,
-                },
-            });
-
-            await tx.billTest.updateMany({
-                where: { billId: report.billId },
-                data: { status: 'completed' },
-            });
-
-            return this.getById(id, tx);
+        const report = await prisma.labReport.findUnique({
+            where: { id: parseId(id) },
+            include: reportInclude,
         });
+
+        if (!report) throw new AppError('Report not found', 404);
+
+        const emptyResults = report.reportTests.filter((rt) => !rt.resultValue?.trim());
+        if (emptyResults.length) {
+            throw new AppError('Enter all test results before approval.', 422, {
+                missing: emptyResults.map((r) => r.testName),
+            });
+        }
+
+        const samples = await prisma.sample.findMany({
+            where: { billId: report.billId, status: { in: ['collected', 'processing', 'completed'] } },
+            orderBy: { collectedAt: 'asc' },
+        });
+
+        const pdfPath = await generateReportPdf(report, samples);
+
+        await prisma.labReport.update({
+            where: { id: parseId(id) },
+            data: {
+                status: 'approved',
+                approvedById: approvedById || null,
+                approvedAt: new Date(),
+                pdfPath,
+            },
+        });
+
+        await prisma.billTest.updateMany({
+            where: { billId: report.billId },
+            data: { status: 'completed' },
+        });
+
+        return this.getById(id);
     },
 
     getPdfFilePath(report) {

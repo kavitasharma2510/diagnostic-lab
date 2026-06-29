@@ -1,4 +1,5 @@
 import apiClient from '../api/client';
+import { apiUrl } from '../config/api';
 
 export const testCategoryService = {
     list: (params) => apiClient.get('/test-categories', { params }),
@@ -54,8 +55,6 @@ export const sampleCollectionService = {
     barcodeLabel: (id) => apiClient.get(`/samples/${id}/barcode-label`),
 };
 
-const API_BASE = '';
-
 export const reportService = {
     list: (params) => apiClient.get('/reports', { params }),
     eligibleBills: () => apiClient.get('/reports/eligible-bills'),
@@ -64,6 +63,6 @@ export const reportService = {
     saveResults: (id, data) => apiClient.put(`/reports/${id}/results`, data),
     approve: (id, data) => apiClient.post(`/reports/${id}/approve`, data),
     whatsappLink: (id) => apiClient.get(`/reports/${id}/whatsapp-link`),
-    previewUrl: (id) => `/api/reports/${id}/preview`,
-    downloadUrl: (id) => `/api/reports/${id}/download`,
+    previewUrl: (id) => apiUrl(`/api/reports/${id}/preview`),
+    downloadUrl: (id) => apiUrl(`/api/reports/${id}/download`),
 };

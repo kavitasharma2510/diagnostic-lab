@@ -1,17 +1,17 @@
 import prisma from '../lib/prisma.js';
 import { AppError } from '../middleware/errorHandler.js';
-import { buildPagination, paginatedResponse } from '../utils/pagination.js';
+import { buildPagination, paginatedResponse, paginatedList } from '../utils/pagination.js';
 import { serialize } from '../utils/serialize.js';
 import { parseId, parseIds } from '../utils/parseId.js';
 import { BILL_TEST_STATUS } from '../utils/billTestStatus.js';
 
 const SAMPLE_STATUSES = ['pending', 'collected', 'processing', 'completed', 'rejected'];
 
-async function generateSampleNo(tx) {
+async function generateSampleNo(db = prisma) {
     const today = new Date();
     const prefix = `SMP-${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`;
 
-    const last = await tx.sample.findFirst({
+    const last = await db.sample.findFirst({
         where: { sampleNo: { startsWith: prefix } },
         orderBy: { sampleNo: 'desc' },
     });
@@ -20,11 +20,11 @@ async function generateSampleNo(tx) {
     return `${prefix}-${String(sequence).padStart(4, '0')}`;
 }
 
-async function generateBarcode(tx) {
+async function generateBarcode(db = prisma) {
     const today = new Date();
     const prefix = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`;
 
-    const last = await tx.sample.findFirst({
+    const last = await db.sample.findFirst({
         where: { barcode: { startsWith: prefix } },
         orderBy: { barcode: 'desc' },
     });
@@ -33,8 +33,8 @@ async function generateBarcode(tx) {
     return `${prefix}${String(sequence).padStart(5, '0')}`;
 }
 
-async function recordStatus(tx, sampleId, status, changedById = null, remarks = null) {
-    await tx.sampleStatusHistory.create({
+async function recordStatus(db, sampleId, status, changedById = null, remarks = null) {
+    await db.sampleStatusHistory.create({
         data: {
             sampleId,
             status,
@@ -163,67 +163,65 @@ export const sampleCollectionService = {
             });
         }
 
-        return prisma.$transaction(async (tx) => {
-            const bill = await tx.bill.findUnique({
-                where: { id: parseId(bill_id) },
-                include: { patient: true },
-            });
-
-            if (!bill) {
-                throw new AppError('Bill not found', 404);
-            }
-
-            const billTests = await tx.billTest.findMany({
-                where: {
-                    id: { in: bill_test_ids },
-                    billId: parseId(bill_id),
-                    status: BILL_TEST_STATUS.PENDING_SAMPLE,
-                },
-                include: { labTest: true },
-            });
-
-            if (billTests.length !== bill_test_ids.length) {
-                throw new AppError('One or more tests are invalid or already collected.', 422);
-            }
-
-            const sampleNo = await generateSampleNo(tx);
-            const barcode = await generateBarcode(tx);
-
-            const sample = await tx.sample.create({
-                data: {
-                    billId: parseId(bill_id),
-                    patientId: bill.patientId,
-                    sampleNo,
-                    barcode,
-                    sampleType: sample_type,
-                    status: 'collected',
-                    collectedById: collected_by_id || null,
-                    collectedAt: new Date(),
-                    remarks: remarks || null,
-                },
-            });
-
-            await recordStatus(tx, sample.id, 'pending', collected_by_id, 'Sample record created');
-            await recordStatus(tx, sample.id, 'collected', collected_by_id, remarks);
-
-            for (const bt of billTests) {
-                await tx.sampleTest.create({
-                    data: {
-                        sampleId: sample.id,
-                        billTestId: bt.id,
-                        labTestId: bt.labTestId,
-                        status: 'collected',
-                    },
-                });
-
-                await tx.billTest.update({
-                    where: { id: bt.id },
-                    data: { status: BILL_TEST_STATUS.COLLECTED },
-                });
-            }
-
-            return this.getById(sample.id, tx);
+        const bill = await prisma.bill.findUnique({
+            where: { id: parseId(bill_id) },
+            include: { patient: true },
         });
+
+        if (!bill) {
+            throw new AppError('Bill not found', 404);
+        }
+
+        const billTests = await prisma.billTest.findMany({
+            where: {
+                id: { in: bill_test_ids },
+                billId: parseId(bill_id),
+                status: BILL_TEST_STATUS.PENDING_SAMPLE,
+            },
+            include: { labTest: true },
+        });
+
+        if (billTests.length !== bill_test_ids.length) {
+            throw new AppError('One or more tests are invalid or already collected.', 422);
+        }
+
+        const sampleNo = await generateSampleNo();
+        const barcode = await generateBarcode();
+
+        const sample = await prisma.sample.create({
+            data: {
+                billId: parseId(bill_id),
+                patientId: bill.patientId,
+                sampleNo,
+                barcode,
+                sampleType: sample_type,
+                status: 'collected',
+                collectedById: collected_by_id || null,
+                collectedAt: new Date(),
+                remarks: remarks || null,
+            },
+        });
+
+        await recordStatus(prisma, sample.id, 'pending', collected_by_id, 'Sample record created');
+        await recordStatus(prisma, sample.id, 'collected', collected_by_id, remarks);
+
+        for (const bt of billTests) {
+            await prisma.sampleTest.create({
+                data: {
+                    sampleId: sample.id,
+                    billTestId: bt.id,
+                    labTestId: bt.labTestId,
+                    status: 'collected',
+                },
+            });
+
+            await prisma.billTest.update({
+                where: { id: bt.id },
+                data: { status: BILL_TEST_STATUS.COLLECTED },
+            });
+        }
+
+        return this.getById(sample.id);
     },
 
     async list(filters = {}) {
@@ -265,7 +263,7 @@ export const sampleCollectionService = {
             }
         }
 
-        const [total, rows] = await prisma.$transaction([
+        const [total, rows] = await paginatedList(
             prisma.sample.count({ where }),
             prisma.sample.findMany({
                 where,
@@ -279,7 +277,7 @@ export const sampleCollectionService = {
                     _count: { select: { sampleTests: true } },
                 },
             }),
-        ]);
+        );
 
         const data = rows.map((row) => mapSample({
             ...row,
@@ -289,8 +287,8 @@ export const sampleCollectionService = {
         return paginatedResponse(data, total, currentPage, limit);
     },
 
-    async getById(id, tx = prisma) {
-        const sample = await tx.sample.findUnique({
+    async getById(id) {
+        const sample = await prisma.sample.findUnique({
             where: { id: parseId(id) },
             include: {
                 patient: true,
@@ -326,46 +324,44 @@ export const sampleCollectionService = {
             });
         }
 
-        return prisma.$transaction(async (tx) => {
-            const sample = await tx.sample.findUnique({
-                where: { id: parseId(id) },
-                include: { sampleTests: true },
-            });
-
-            if (!sample) {
-                throw new AppError('Sample not found', 404);
-            }
-
-            if (sample.status === 'rejected') {
-                throw new AppError('Sample is already rejected.', 422);
-            }
-
-            await tx.sample.update({
-                where: { id: parseId(id) },
-                data: {
-                    status: 'rejected',
-                    rejectedById: rejected_by_id || null,
-                    rejectedAt: new Date(),
-                    rejectionReason: rejection_reason,
-                },
-            });
-
-            await tx.sampleTest.updateMany({
-                where: { sampleId: parseId(id) },
-                data: { status: 'rejected' },
-            });
-
-            for (const st of sample.sampleTests) {
-                await tx.billTest.update({
-                    where: { id: st.billTestId },
-                    data: { status: BILL_TEST_STATUS.PENDING_SAMPLE },
-                });
-            }
-
-            await recordStatus(tx, parseId(id), 'rejected', rejected_by_id, rejection_reason);
-
-            return this.getById(id, tx);
+        const sample = await prisma.sample.findUnique({
+            where: { id: parseId(id) },
+            include: { sampleTests: true },
         });
+
+        if (!sample) {
+            throw new AppError('Sample not found', 404);
+        }
+
+        if (sample.status === 'rejected') {
+            throw new AppError('Sample is already rejected.', 422);
+        }
+
+        await prisma.sample.update({
+            where: { id: parseId(id) },
+            data: {
+                status: 'rejected',
+                rejectedById: rejected_by_id || null,
+                rejectedAt: new Date(),
+                rejectionReason: rejection_reason,
+            },
+        });
+
+        await prisma.sampleTest.updateMany({
+            where: { sampleId: parseId(id) },
+            data: { status: 'rejected' },
+        });
+
+        for (const st of sample.sampleTests) {
+            await prisma.billTest.update({
+                where: { id: st.billTestId },
+                data: { status: BILL_TEST_STATUS.PENDING_SAMPLE },
+            });
+        }
+
+        await recordStatus(prisma, parseId(id), 'rejected', rejected_by_id, rejection_reason);
+
+        return this.getById(id);
     },
 
     async updateStatus(id, data) {
@@ -375,26 +371,24 @@ export const sampleCollectionService = {
             throw new AppError('Invalid sample status.', 422);
         }
 
-        return prisma.$transaction(async (tx) => {
-            const sample = await tx.sample.findUnique({ where: { id: parseId(id) } });
-            if (!sample) throw new AppError('Sample not found', 404);
+        const sample = await prisma.sample.findUnique({ where: { id: parseId(id) } });
+        if (!sample) throw new AppError('Sample not found', 404);
 
-            await tx.sample.update({
-                where: { id: parseId(id) },
+        await prisma.sample.update({
+            where: { id: parseId(id) },
+            data: { status },
+        });
+
+        if (status === 'processing' || status === 'completed') {
+            await prisma.sampleTest.updateMany({
+                where: { sampleId: parseId(id) },
                 data: { status },
             });
+        }
 
-            if (status === 'processing' || status === 'completed') {
-                await tx.sampleTest.updateMany({
-                    where: { sampleId: parseId(id) },
-                    data: { status },
-                });
-            }
+        await recordStatus(prisma, parseId(id), status, changed_by_id, remarks);
 
-            await recordStatus(tx, parseId(id), status, changed_by_id, remarks);
-
-            return this.getById(id, tx);
-        });
+        return this.getById(id);
     },
 
     getBarcodeLabel(id) {

@@ -6,6 +6,10 @@ export function buildPagination(page = 1, perPage = 15) {
     return { currentPage, limit, skip };
 }
 
+export async function paginatedList(countQuery, findQuery) {
+    return Promise.all([countQuery, findQuery]);
+}
+
 export function paginatedResponse(data, total, page, perPage) {
     const lastPage = Math.max(1, Math.ceil(total / perPage));
 

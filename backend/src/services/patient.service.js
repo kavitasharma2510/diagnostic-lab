@@ -1,6 +1,6 @@
 import prisma from '../lib/prisma.js';
 import { AppError } from '../middleware/errorHandler.js';
-import { buildPagination, paginatedResponse } from '../utils/pagination.js';
+import { buildPagination, paginatedResponse, paginatedList } from '../utils/pagination.js';
 import { serialize } from '../utils/serialize.js';
 import { parseId } from '../utils/parseId.js';
 
@@ -14,11 +14,11 @@ function mapPatient(row) {
     });
 }
 
-async function generatePatientNo(tx) {
+async function generatePatientNo(db = prisma) {
     const today = new Date();
     const prefix = `PAT-${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`;
 
-    const last = await tx.patient.findFirst({
+    const last = await db.patient.findFirst({
         where: { patientNo: { startsWith: prefix } },
         orderBy: { patientNo: 'desc' },
     });
@@ -44,7 +44,7 @@ export const patientService = {
             where.gender = filters.gender;
         }
 
-        const [total, rows] = await prisma.$transaction([
+        const [total, rows] = await paginatedList(
             prisma.patient.count({ where }),
             prisma.patient.findMany({
                 where,
@@ -52,7 +52,7 @@ export const patientService = {
                 take: limit,
                 orderBy: { createdAt: 'desc' },
             }),
-        ]);
+        );
 
         return paginatedResponse(rows.map(mapPatient), total, currentPage, limit);
     },
@@ -70,19 +70,17 @@ export const patientService = {
     },
 
     async create(data) {
-        const patient = await prisma.$transaction(async (tx) => {
-            const patientNo = await generatePatientNo(tx);
-            return tx.patient.create({
-                data: {
-                    patientNo,
-                    name: data.name,
-                    age: data.age ?? null,
-                    gender: data.gender ?? null,
-                    mobile: data.mobile ?? null,
-                    address: data.address ?? null,
-                    referringDoctor: data.referring_doctor ?? null,
-                },
-            });
+        const patientNo = await generatePatientNo();
+        const patient = await prisma.patient.create({
+            data: {
+                patientNo,
+                name: data.name,
+                age: data.age ?? null,
+                gender: data.gender ?? null,
+                mobile: data.mobile ?? null,
+                address: data.address ?? null,
+                referringDoctor: data.referring_doctor ?? null,
+            },
         });
 
         return mapPatient(patient);

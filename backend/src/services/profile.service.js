@@ -1,6 +1,6 @@
 import prisma from '../lib/prisma.js';
 import { AppError } from '../middleware/errorHandler.js';
-import { buildPagination, paginatedResponse } from '../utils/pagination.js';
+import { buildPagination, paginatedResponse, paginatedList } from '../utils/pagination.js';
 import { serialize } from '../utils/serialize.js';
 import { parseId } from '../utils/parseId.js';
 
@@ -47,7 +47,7 @@ export const profileService = {
             where.status = filters.status;
         }
 
-        const [total, rows] = await prisma.$transaction([
+        const [total, rows] = await paginatedList(
             prisma.profile.count({ where }),
             prisma.profile.findMany({
                 where,
@@ -56,7 +56,7 @@ export const profileService = {
                 orderBy: { name: 'asc' },
                 include: { _count: { select: { items: true } } },
             }),
-        ]);
+        );
 
         return paginatedResponse(
             rows.map((row) => serialize({ ...row, tests_count: row._count.items })),
@@ -86,61 +86,55 @@ export const profileService = {
     },
 
     async create(data) {
-        const profile = await prisma.$transaction(async (tx) => {
-            const created = await tx.profile.create({
-                data: {
-                    name: data.name,
-                    code: data.code,
-                    price: data.price,
-                    description: data.description,
-                    status: data.status || 'active',
-                },
-            });
+        const created = await prisma.profile.create({
+            data: {
+                name: data.name,
+                code: data.code,
+                price: data.price,
+                description: data.description,
+                status: data.status || 'active',
+            },
+        });
 
-            if (data.test_ids?.length) {
-                await this._syncItemsTx(tx, created.id, data.test_ids);
-            }
+        if (data.test_ids?.length) {
+            await this._syncItems(created.id, data.test_ids);
+        }
 
-            return tx.profile.findUnique({
-                where: { id: created.id },
-                include: {
-                    items: {
-                        orderBy: { sortOrder: 'asc' },
-                        include: { labTest: true },
-                    },
-                    _count: { select: { items: true } },
+        const profile = await prisma.profile.findUnique({
+            where: { id: created.id },
+            include: {
+                items: {
+                    orderBy: { sortOrder: 'asc' },
+                    include: { labTest: true },
                 },
-            });
+                _count: { select: { items: true } },
+            },
         });
 
         return mapProfile(profile);
     },
 
     async update(id, data) {
-        await prisma.$transaction(async (tx) => {
-            const payload = {};
-            ['name', 'code', 'price', 'description', 'status'].forEach((field) => {
-                if (data[field] !== undefined) payload[field] = data[field];
-            });
-
-            if (Object.keys(payload).length) {
-                await tx.profile.update({ where: { id: parseId(id) }, data: payload });
-            }
-
-            if (data.test_ids) {
-                await this._syncItemsTx(tx, parseId(id), data.test_ids);
-            }
+        const payload = {};
+        ['name', 'code', 'price', 'description', 'status'].forEach((field) => {
+            if (data[field] !== undefined) payload[field] = data[field];
         });
+
+        if (Object.keys(payload).length) {
+            await prisma.profile.update({ where: { id: parseId(id) }, data: payload });
+        }
+
+        if (data.test_ids) {
+            await this._syncItems(parseId(id), data.test_ids);
+        }
 
         return this.getById(id);
     },
 
     async remove(id) {
         try {
-            await prisma.$transaction([
-                prisma.profileTestItem.deleteMany({ where: { profileId: parseId(id) } }),
-                prisma.profile.delete({ where: { id: parseId(id) } }),
-            ]);
+            await prisma.profileTestItem.deleteMany({ where: { profileId: parseId(id) } });
+            await prisma.profile.delete({ where: { id: parseId(id) } });
         } catch {
             throw new AppError('Profile not found', 404);
         }
@@ -155,24 +149,22 @@ export const profileService = {
             });
         }
 
-        await prisma.$transaction(async (tx) => {
-            await tx.profileTestItem.deleteMany({ where: { profileId: parseId(id) } });
+        await prisma.profileTestItem.deleteMany({ where: { profileId: parseId(id) } });
 
-            for (const [index, item] of tests.entries()) {
-                await tx.profileTestItem.create({
-                    data: {
-                        profileId: parseId(id),
-                        labTestId: item.test_id,
-                        sortOrder: item.sort_order ?? index,
-                    },
-                });
-            }
-        });
+        for (const [index, item] of tests.entries()) {
+            await prisma.profileTestItem.create({
+                data: {
+                    profileId: parseId(id),
+                    labTestId: item.test_id,
+                    sortOrder: item.sort_order ?? index,
+                },
+            });
+        }
 
         return this.getById(id);
     },
 
-    async _syncItemsTx(tx, profileId, testIds) {
+    async _syncItems(profileId, testIds) {
         const uniqueIds = [...new Set(testIds)];
 
         if (uniqueIds.length !== testIds.length) {
@@ -181,10 +173,10 @@ export const profileService = {
             });
         }
 
-        await tx.profileTestItem.deleteMany({ where: { profileId } });
+        await prisma.profileTestItem.deleteMany({ where: { profileId } });
 
         for (const [index, labTestId] of testIds.entries()) {
-            await tx.profileTestItem.create({
+            await prisma.profileTestItem.create({
                 data: {
                     profileId,
                     labTestId,

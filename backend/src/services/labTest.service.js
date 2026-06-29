@@ -1,6 +1,6 @@
 import prisma from '../lib/prisma.js';
 import { AppError } from '../middleware/errorHandler.js';
-import { buildPagination, paginatedResponse } from '../utils/pagination.js';
+import { buildPagination, paginatedResponse, paginatedList } from '../utils/pagination.js';
 import { serialize } from '../utils/serialize.js';
 import { parseId } from '../utils/parseId.js';
 
@@ -63,7 +63,7 @@ export const labTestService = {
             where.reportType = filters.report_type;
         }
 
-        const [total, rows] = await prisma.$transaction([
+        const [total, rows] = await paginatedList(
             prisma.labTest.count({ where }),
             prisma.labTest.findMany({
                 where,
@@ -75,7 +75,7 @@ export const labTestService = {
                     _count: { select: { parameters: true } },
                 },
             }),
-        ]);
+        );
 
         return paginatedResponse(rows.map(mapLabTest), total, currentPage, limit);
     },
@@ -97,49 +97,47 @@ export const labTestService = {
     },
 
     async create(data) {
-        const test = await prisma.$transaction(async (tx) => {
-            const created = await tx.labTest.create({
-                data: {
-                    testCategoryId: data.test_category_id,
-                    name: data.name,
-                    code: data.code,
-                    sampleType: data.sample_type,
-                    reportType: data.report_type || 'single',
-                    unit: data.unit,
-                    price: data.price,
-                    method: data.method,
-                    defaultValue: data.default_value,
-                    referenceRange: data.reference_range,
-                    minValue: data.min_value,
-                    maxValue: data.max_value,
-                    sortOrder: data.sort_order ?? 0,
-                    status: data.status || 'active',
-                },
-            });
+        const created = await prisma.labTest.create({
+            data: {
+                testCategoryId: data.test_category_id,
+                name: data.name,
+                code: data.code,
+                sampleType: data.sample_type,
+                reportType: data.report_type || 'single',
+                unit: data.unit,
+                price: data.price,
+                method: data.method,
+                defaultValue: data.default_value,
+                referenceRange: data.reference_range,
+                minValue: data.min_value,
+                maxValue: data.max_value,
+                sortOrder: data.sort_order ?? 0,
+                status: data.status || 'active',
+            },
+        });
 
-            if (data.parameters?.length) {
-                await tx.testParameter.createMany({
-                    data: data.parameters.map((param, index) => ({
-                        labTestId: created.id,
-                        name: param.name,
-                        unit: param.unit,
-                        referenceRange: param.reference_range,
-                        minValue: param.min_value,
-                        maxValue: param.max_value,
-                        method: param.method,
-                        sortOrder: param.sort_order ?? index,
-                        status: param.status || 'active',
-                    })),
-                });
-            }
-
-            return tx.labTest.findUnique({
-                where: { id: created.id },
-                include: {
-                    category: true,
-                    parameters: { orderBy: { sortOrder: 'asc' } },
-                },
+        if (data.parameters?.length) {
+            await prisma.testParameter.createMany({
+                data: data.parameters.map((param, index) => ({
+                    labTestId: created.id,
+                    name: param.name,
+                    unit: param.unit,
+                    referenceRange: param.reference_range,
+                    minValue: param.min_value,
+                    maxValue: param.max_value,
+                    method: param.method,
+                    sortOrder: param.sort_order ?? index,
+                    status: param.status || 'active',
+                })),
             });
+        }
+
+        const test = await prisma.labTest.findUnique({
+            where: { id: created.id },
+            include: {
+                category: true,
+                parameters: { orderBy: { sortOrder: 'asc' } },
+            },
         });
 
         return mapLabTest(test);
@@ -195,10 +193,8 @@ export const labTestService = {
         }
 
         try {
-            await prisma.$transaction([
-                prisma.testParameter.deleteMany({ where: { labTestId: parseId(id) } }),
-                prisma.labTest.delete({ where: { id: parseId(id) } }),
-            ]);
+            await prisma.testParameter.deleteMany({ where: { labTestId: parseId(id) } });
+            await prisma.labTest.delete({ where: { id: parseId(id) } });
         } catch {
             throw new AppError('Test not found', 404);
         }
