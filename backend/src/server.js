@@ -11,6 +11,7 @@ import patientsRouter from './routes/patients.routes.js';
 import billsRouter from './routes/bills.routes.js';
 import samplesRouter from './routes/samples.routes.js';
 import reportsRouter from './routes/reports.routes.js';
+import registrationsRouter from './routes/registrations.routes.js';
 import { reportController } from './controllers/report.controller.js';
 import { errorHandler, asyncHandler } from './middleware/errorHandler.js';
 
@@ -59,6 +60,7 @@ app.use('/api/patients', patientsRouter);
 app.use('/api/bills', billsRouter);
 app.use('/api/samples', samplesRouter);
 app.use('/api/reports', reportsRouter);
+app.use('/api/registrations', registrationsRouter);
 
 app.get('/report/verify/:reportNo', asyncHandler(reportController.verify));
 

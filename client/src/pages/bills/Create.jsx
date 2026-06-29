@@ -6,7 +6,7 @@ import { Dropdown } from 'primereact/dropdown';
 import { MultiSelect } from 'primereact/multiselect';
 import { InputText } from 'primereact/inputtext';
 import AppLayout from '../../components/AppLayout';
-import { billService, patientService, labTestService, profileService } from '../../services/api';
+import { billService, patientService, labTestService } from '../../services/api';
 import { useToast } from '../../context/ToastContext';
 
 const paymentOptions = [
@@ -22,11 +22,9 @@ export default function BillCreate() {
     const [errors, setErrors] = useState({});
     const [patients, setPatients] = useState([]);
     const [labTests, setLabTests] = useState([]);
-    const [profiles, setProfiles] = useState([]);
     const [form, setForm] = useState({
         patient_id: searchParams.get('patient_id') || null,
         lab_test_ids: [],
-        profile_ids: [],
         payment_status: 'Unpaid',
         referred_doctor: '',
     });
@@ -35,11 +33,9 @@ export default function BillCreate() {
         Promise.all([
             patientService.list({ per_page: 200 }),
             labTestService.list({ per_page: 200, status: 'active' }),
-            profileService.list({ per_page: 200, status: 'active' }),
-        ]).then(([patientsRes, testsRes, profilesRes]) => {
+        ]).then(([patientsRes, testsRes]) => {
             setPatients(patientsRes.data.data);
             setLabTests(testsRes.data.data);
-            setProfiles(profilesRes.data.data);
         });
     }, []);
 
@@ -58,12 +54,8 @@ export default function BillCreate() {
             const test = labTests.find((t) => t.id === id);
             if (test) total += Number(test.price || 0);
         }
-        for (const id of form.profile_ids) {
-            const profile = profiles.find((p) => p.id === id);
-            if (profile) total += Number(profile.price || 0);
-        }
         return total;
-    }, [form.lab_test_ids, form.profile_ids, labTests, profiles]);
+    }, [form.lab_test_ids, labTests]);
 
     const patientOptions = patients.map((p) => ({
         label: `${p.patient_no} — ${p.name}`,
@@ -122,25 +114,6 @@ export default function BillCreate() {
                                 )}
                             />
                         </div>
-                        <div className="form-field full-width">
-                            <label>Profiles / Packages</label>
-                            <MultiSelect
-                                value={form.profile_ids}
-                                options={profiles}
-                                optionLabel="name"
-                                optionValue="id"
-                                onChange={(e) => setForm({ ...form, profile_ids: e.value })}
-                                placeholder="Select profiles (expanded into individual tests)"
-                                filter
-                                display="chip"
-                                itemTemplate={(item) => (
-                                    <div>
-                                        <strong>{item.name}</strong>
-                                        <span className="text-muted"> — ₹{item.price}</span>
-                                    </div>
-                                )}
-                            />
-                        </div>
                         <div className="form-field">
                             <label>Payment Status</label>
                             <Dropdown
@@ -160,9 +133,6 @@ export default function BillCreate() {
                         <div className="form-field">
                             <label>Estimated Total</label>
                             <p style={{ fontSize: '1.25rem', fontWeight: 600, margin: 0 }}>₹{estimatedTotal.toFixed(2)}</p>
-                            <p className="text-muted" style={{ fontSize: '0.85rem' }}>
-                                Profiles are expanded into individual BillTest rows on save.
-                            </p>
                         </div>
                     </div>
                     <div className="form-actions">

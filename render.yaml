@@ -1,0 +1,51 @@
+# Render Blueprint — Tyagi Pathology API
+# Deploy: Render Dashboard → New → Blueprint → connect this repo
+# https://render.com/docs/blueprint-spec
+
+services:
+  - type: web
+    name: diagnostic-lab-api
+    runtime: node
+    region: singapore
+    plan: starter
+    rootDir: backend
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: MONGO_URI
+        sync: false
+      - key: CLIENT_URL
+        sync: false
+      - key: APP_URL
+        sync: false
+      - key: LAB_NAME
+        value: TYAGI PATHOLOGY
+      - key: LAB_NAME_PART1
+        value: TYAGI
+      - key: LAB_NAME_PART2
+        value: PATHOLOGY
+      - key: LAB_TAGLINE
+        value: ACCURATE REPORTS, ADVANCED TECHNOLOGY
+      - key: LAB_OWNER_NAME
+        value: PRANKUL SHARMA
+      - key: LAB_SIGNATURE_NAME
+        value: Prankul Sharma
+      - key: LAB_SIGNATURE_TITLE
+        value: Lab Technician
+      - key: LAB_ADDRESS
+        value: HOSPITAL ROAD INFRONT OF|KUND BAGAR, BARODA, DISTT. SHEOPUR (M.P.)
+      - key: LAB_PHONE
+        value: "9399785895"
+      - key: LAB_EMAIL
+        sync: false
+      - key: LAB_LETTERHEAD_FILE
+        value: Tyagi_Pathology_Letterhead_A4_Final.pdf
+      - key: LAB_LOGO_FILE
+        value: tyagi-pathology-logo.png
+      - key: LAB_REPORT_TEMPLATE
+        value: tyagi
+      - key: LAB_USE_LETTERHEAD
+        value: "false"

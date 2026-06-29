@@ -4,6 +4,24 @@ import { buildPagination, paginatedResponse, paginatedList } from '../utils/pagi
 import { serialize } from '../utils/serialize.js';
 import { parseId } from '../utils/parseId.js';
 
+/** Count tests in a category — grouped panels count their parameters (e.g. CBC = 19). */
+async function resolveCategoryTestsCount(categoryId) {
+    const tests = await prisma.labTest.findMany({
+        where: { testCategoryId: categoryId, status: 'active' },
+        include: { _count: { select: { parameters: true } } },
+    });
+
+    const groupedWithParams = tests.filter(
+        (t) => t.reportType === 'grouped' && t._count.parameters > 0,
+    );
+
+    if (groupedWithParams.length) {
+        return groupedWithParams.reduce((sum, t) => sum + t._count.parameters, 0);
+    }
+
+    return tests.length;
+}
+
 export const testCategoryService = {
     async list(filters = {}) {
         const { currentPage, limit, skip } = buildPagination(filters.page, filters.per_page);
@@ -31,10 +49,10 @@ export const testCategoryService = {
             }),
         );
 
-        const data = rows.map((row) => ({
+        const data = await Promise.all(rows.map(async (row) => ({
             ...serialize(row),
-            tests_count: row._count.labTests,
-        }));
+            tests_count: await resolveCategoryTestsCount(row.id),
+        })));
 
         return paginatedResponse(data, total, currentPage, limit);
     },
@@ -42,14 +60,38 @@ export const testCategoryService = {
     async getById(id) {
         const category = await prisma.testCategory.findUnique({
             where: { id: parseId(id) },
-            include: { _count: { select: { labTests: true } } },
+            include: {
+                labTests: {
+                    where: { status: 'active' },
+                    orderBy: [{ reportType: 'desc' }, { sortOrder: 'asc' }, { name: 'asc' }],
+                    include: {
+                        parameters: { where: { status: 'active' }, orderBy: { sortOrder: 'asc' } },
+                    },
+                },
+            },
         });
 
         if (!category) {
             throw new AppError('Test category not found', 404);
         }
 
-        return serialize({ ...category, tests_count: category._count.labTests });
+        const tests_count = await resolveCategoryTestsCount(category.id);
+
+        return serialize({
+            ...category,
+            tests_count,
+            lab_tests: category.labTests.map((t) => ({
+                ...serialize(t),
+                report_type: t.reportType,
+                sample_type: t.sampleType,
+                parameters_count: t.parameters?.length || 0,
+                parameters: t.parameters?.map((p) => serialize({
+                    ...p,
+                    reference_range: p.referenceRange,
+                    sort_order: p.sortOrder,
+                })),
+            })),
+        });
     },
 
     async create(data) {
@@ -65,7 +107,10 @@ export const testCategoryService = {
                 include: { _count: { select: { labTests: true } } },
             });
 
-            return serialize({ ...category, tests_count: category._count.labTests });
+            return serialize({
+                ...category,
+                tests_count: await resolveCategoryTestsCount(category.id),
+            });
         } catch {
             throw new AppError('Test category not found', 404);
         }

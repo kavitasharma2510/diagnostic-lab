@@ -5,7 +5,9 @@ import { Button } from 'primereact/button';
 import { InputText } from 'primereact/inputtext';
 import { InputNumber } from 'primereact/inputnumber';
 import { Dropdown } from 'primereact/dropdown';
+import { confirmDialog } from 'primereact/confirmdialog';
 import AppLayout from '../../components/AppLayout';
+import PageHeader from '../../components/PageHeader';
 import { labTestService, testCategoryService } from '../../services/api';
 import { useToast } from '../../context/ToastContext';
 
@@ -75,10 +77,28 @@ export default function LabTestEdit() {
         }
     }
 
+    function confirmDelete() {
+        confirmDialog({
+            message: `Delete test "${form.name}"? This cannot be undone.`,
+            header: 'Confirm Delete',
+            icon: 'pi pi-exclamation-triangle',
+            acceptClassName: 'p-button-danger',
+            accept: async () => {
+                try {
+                    await labTestService.delete(id);
+                    toast.success('Test deleted successfully');
+                    navigate('/lab-tests');
+                } catch (e) {
+                    toast.error(e.response?.data?.errors?.test?.[0] || e.response?.data?.message || 'Delete failed');
+                }
+            },
+        });
+    }
+
     return (
         <AppLayout>
-            <div className="page-header"><h1 className="page-title">Edit Lab Test</h1></div>
-            <Card>
+            <PageHeader title="Edit Lab Test" subtitle={form.name || 'Update test details'} />
+            <Card className="content-card">
                 <form onSubmit={submit}>
                     <div className="form-grid">
                         <div className="form-field"><label>Category</label><Dropdown value={form.test_category_id} options={categories} optionLabel="name" optionValue="id" onChange={(e) => setForm({ ...form, test_category_id: e.value })} /></div>
@@ -90,12 +110,12 @@ export default function LabTestEdit() {
                     </div>
                     {form.report_type === 'grouped' && (
                         <div style={{ marginTop: '1.5rem' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
+                            <div className="param-section-header">
                                 <h3>Parameters</h3>
                                 <Button type="button" label="Add Parameter" icon="pi pi-plus" outlined onClick={() => setParameters([...parameters, emptyParam()])} />
                             </div>
                             {parameters.map((p, i) => (
-                                <div key={p.id || i} style={{ padding: '1rem', background: '#f8fafc', borderRadius: 8, marginBottom: '0.75rem' }}>
+                                <div key={p.id || i} className="param-panel">
                                     <div className="form-grid">
                                         <div className="form-field"><label>Name</label><InputText value={p.name} onChange={(e) => { const n = [...parameters]; n[i].name = e.target.value; setParameters(n); }} /></div>
                                         <div className="form-field"><label>Unit</label><InputText value={p.unit} onChange={(e) => { const n = [...parameters]; n[i].unit = e.target.value; setParameters(n); }} /></div>
@@ -109,6 +129,7 @@ export default function LabTestEdit() {
                     <div className="form-actions">
                         <Button type="submit" label="Save" loading={loading} />
                         <Button type="button" label="Cancel" severity="secondary" outlined onClick={() => navigate(-1)} />
+                        <Button type="button" label="Delete" icon="pi pi-trash" severity="danger" outlined onClick={confirmDelete} />
                     </div>
                 </form>
             </Card>

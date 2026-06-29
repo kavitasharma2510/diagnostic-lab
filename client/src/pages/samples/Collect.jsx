@@ -39,7 +39,7 @@ export default function SampleCollect() {
     async function submit(e) {
         e.preventDefault();
         if (!billId || !sampleType || !billTestIds.length) {
-            toast.error('Invalid collection data. Start from Pending Samples.');
+            toast.error('Invalid collection data.');
             return;
         }
 
@@ -64,8 +64,8 @@ export default function SampleCollect() {
         return (
             <AppLayout>
                 <Card>
-                    <p>Select a pending sample group from the pending list.</p>
-                    <Button label="Go to Pending Samples" onClick={() => navigate('/samples/pending')} />
+                    <p>Open sample collection from a registration workflow or use Collected Samples.</p>
+                    <Button label="Collected Samples" onClick={() => navigate('/samples')} />
                 </Card>
             </AppLayout>
         );
@@ -103,7 +103,7 @@ export default function SampleCollect() {
 
                     <div className="form-actions">
                         <Button type="submit" label="Mark as Collected" icon="pi pi-check" loading={loading} />
-                        <Button type="button" label="Cancel" severity="secondary" outlined onClick={() => navigate('/samples/pending')} />
+                        <Button type="button" label="Cancel" severity="secondary" outlined onClick={() => navigate('/samples')} />
                     </div>
                 </form>
             </Card>

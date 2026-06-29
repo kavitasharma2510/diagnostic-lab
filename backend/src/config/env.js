@@ -14,6 +14,10 @@ if (process.env.MONGO_URI) {
     process.env.MONGO_URI = process.env.MONGO_URI.trim();
 }
 
+if (!process.env.APP_URL && process.env.RENDER_EXTERNAL_URL) {
+    process.env.APP_URL = process.env.RENDER_EXTERNAL_URL;
+}
+
 const puppeteerCacheDir = path.resolve(__dirname, '../../.cache/puppeteer');
 process.env.PUPPETEER_CACHE_DIR = puppeteerCacheDir;
 

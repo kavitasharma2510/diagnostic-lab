@@ -3,6 +3,7 @@ node_modules/
 backend/.env
 client/.env
 backend/.cache/
+backend/public/assets/.cache/
 backend/public/reports/
 dist/
 client/dist/

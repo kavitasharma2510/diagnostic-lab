@@ -1,5 +1,5 @@
 import apiClient from '../api/client';
-import { apiUrl } from '../config/api';
+import { mediaUrl } from '../config/api';
 
 export const testCategoryService = {
     list: (params) => apiClient.get('/test-categories', { params }),
@@ -37,6 +37,10 @@ export const patientService = {
     delete: (id) => apiClient.delete(`/patients/${id}`),
 };
 
+export const registrationService = {
+    register: (data) => apiClient.post('/registrations', data),
+};
+
 export const billService = {
     list: (params) => apiClient.get('/bills', { params }),
     get: (id) => apiClient.get(`/bills/${id}`),
@@ -63,6 +67,6 @@ export const reportService = {
     saveResults: (id, data) => apiClient.put(`/reports/${id}/results`, data),
     approve: (id, data) => apiClient.post(`/reports/${id}/approve`, data),
     whatsappLink: (id) => apiClient.get(`/reports/${id}/whatsapp-link`),
-    previewUrl: (id) => apiUrl(`/api/reports/${id}/preview`),
-    downloadUrl: (id) => apiUrl(`/api/reports/${id}/download`),
+    previewUrl: (id) => mediaUrl(`/api/reports/${id}/preview`),
+    downloadUrl: (id) => mediaUrl(`/api/reports/${id}/download`),
 };

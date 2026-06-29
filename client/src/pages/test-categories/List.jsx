@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { Card } from 'primereact/card';
+import { useNavigate } from 'react-router-dom';
 import { Button } from 'primereact/button';
 import { DataTable } from 'primereact/datatable';
 import { Column } from 'primereact/column';
@@ -10,6 +9,8 @@ import { InputSwitch } from 'primereact/inputswitch';
 import { Badge } from 'primereact/badge';
 import { confirmDialog } from 'primereact/confirmdialog';
 import AppLayout from '../../components/AppLayout';
+import PageHeader from '../../components/PageHeader';
+import TableActions from '../../components/TableActions';
 import StatusBadge from '../../components/StatusBadge';
 import { testCategoryService } from '../../services/api';
 import { useToast } from '../../context/ToastContext';
@@ -79,15 +80,13 @@ export default function TestCategoryList() {
 
     return (
         <AppLayout>
-            <div className="page-header">
-                <div>
-                    <h1 className="page-title">Test Categories</h1>
-                    <p className="text-muted">MERN — MongoDB + Express + React</p>
-                </div>
-                <Button label="Add Category" icon="pi pi-plus" onClick={() => navigate('/test-categories/create')} />
-            </div>
-            <Card>
-                <div className="filter-bar">
+            <PageHeader
+                title="Test Categories"
+                subtitle="Create and manage test categories (CBC, LFT, KFT, etc.)"
+                actionLabel="Add Category"
+                onAction={() => navigate('/test-categories/create')}
+            />
+            <div className="filter-bar">
                     <InputText
                         placeholder="Search name or code"
                         value={filters.search}
@@ -129,15 +128,16 @@ export default function TestCategoryList() {
                     <Column
                         header="Actions"
                         body={(row) => (
-                            <div style={{ display: 'flex', gap: '0.25rem' }}>
-                                <Button icon="pi pi-eye" text onClick={() => navigate(`/test-categories/${row.id}`)} />
-                                <Button icon="pi pi-pencil" text severity="warning" onClick={() => navigate(`/test-categories/${row.id}/edit`)} />
-                                <Button icon="pi pi-trash" text severity="danger" onClick={() => confirmDelete(row)} />
-                            </div>
+                            <TableActions
+                                actions={[
+                                    { title: 'View', icon: 'pi pi-eye', onClick: () => navigate(`/test-categories/${row.id}`) },
+                                    { title: 'Edit', icon: 'pi pi-pencil', onClick: () => navigate(`/test-categories/${row.id}/edit`) },
+                                    { title: 'Delete', icon: 'pi pi-trash', onClick: () => confirmDelete(row) },
+                                ]}
+                            />
                         )}
                     />
                 </DataTable>
-            </Card>
         </AppLayout>
     );
 }

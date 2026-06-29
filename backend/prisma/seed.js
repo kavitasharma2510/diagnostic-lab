@@ -1,6 +1,7 @@
 import '../src/config/env.js';
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
+import { GROUPED_PANELS, PANEL_PARAMETERS, PANEL_TEST_CATEGORIES } from '../src/constants/panelSequences.js';
 
 const prisma = new PrismaClient();
 
@@ -12,30 +13,34 @@ async function upsertCategory({ name, code, description }) {
     });
 }
 
-async function seedGroupedTest(categoryId, testData) {
+async function seedGroupedTest(categoryId, panelKey) {
+    const meta = GROUPED_PANELS[panelKey];
+    const parameters = PANEL_PARAMETERS[panelKey];
+    if (!meta || !parameters?.length) return null;
+
     await prisma.testParameter.deleteMany({
-        where: { labTest: { code: testData.code } },
+        where: { labTest: { code: meta.code } },
     });
-    await prisma.labTest.deleteMany({ where: { code: testData.code } });
+    await prisma.labTest.deleteMany({ where: { code: meta.code } });
 
     return prisma.labTest.create({
         data: {
             testCategoryId: categoryId,
-            name: testData.name,
-            code: testData.code,
-            sampleType: testData.sample_type,
+            name: meta.name,
+            code: meta.code,
+            sampleType: meta.sample_type,
             reportType: 'grouped',
-            price: testData.price,
-            method: testData.method,
+            price: meta.price,
+            method: meta.method,
             status: 'active',
             parameters: {
-                create: testData.parameters.map((p, index) => ({
+                create: parameters.map((p, index) => ({
                     name: p.name,
                     unit: p.unit,
                     referenceRange: p.reference_range,
-                    minValue: p.min_value,
-                    maxValue: p.max_value,
-                    method: p.method || testData.method,
+                    minValue: p.min_value ?? null,
+                    maxValue: p.max_value ?? null,
+                    method: p.method || meta.method,
                     sortOrder: index,
                     status: 'active',
                 })),
@@ -84,65 +89,39 @@ async function main() {
     const hem = await upsertCategory({ name: 'Hematology', code: 'HEM', description: 'Blood cell studies' });
     const bio = await upsertCategory({ name: 'Biochemistry', code: 'BIO', description: 'Clinical chemistry' });
     const thy = await upsertCategory({ name: 'Thyroid', code: 'THY', description: 'Thyroid function' });
-    const ser = await upsertCategory({ name: 'Serology', code: 'SER', description: 'Viral markers' });
+    const ser = await upsertCategory({ name: 'Serology', code: 'SER', description: 'Viral and inflammatory markers' });
     const lip = await upsertCategory({ name: 'Lipid Studies', code: 'LIP', description: 'Lipid profile' });
 
-    await seedGroupedTest(hem.id, {
-        name: 'Complete Blood Count (CBC)',
-        code: 'CBC',
-        sample_type: 'EDTA Blood',
-        price: 350,
-        method: 'Automated Hematology Analyzer',
-        parameters: [
-            { name: 'Haemoglobin', unit: 'g/dL', reference_range: '13.0 - 17.0', min_value: 13, max_value: 17 },
-            { name: 'RBC Count', unit: 'million/cumm', reference_range: '4.5 - 5.5', min_value: 4.5, max_value: 5.5 },
-            { name: 'WBC Count', unit: '/cumm', reference_range: '4000 - 11000', min_value: 4000, max_value: 11000 },
-            { name: 'Platelet Count', unit: '/cumm', reference_range: '150000 - 450000', min_value: 150000, max_value: 450000 },
-            { name: 'PCV', unit: '%', reference_range: '40 - 50', min_value: 40, max_value: 50 },
-            { name: 'MCV', unit: 'fL', reference_range: '80 - 100', min_value: 80, max_value: 100 },
-            { name: 'MCH', unit: 'pg', reference_range: '27 - 32', min_value: 27, max_value: 32 },
-            { name: 'MCHC', unit: 'g/dL', reference_range: '32 - 36', min_value: 32, max_value: 36 },
-        ],
-    });
+    for (const panelKey of Object.keys(PANEL_TEST_CATEGORIES)) {
+        const cat = PANEL_TEST_CATEGORIES[panelKey];
+        await upsertCategory({ name: cat.name, code: cat.code, description: cat.description });
+    }
 
-    await seedGroupedTest(bio.id, {
-        name: 'Liver Function Test (LFT)',
-        code: 'LFT',
-        sample_type: 'Serum',
-        price: 600,
-        method: 'Photometry',
-        parameters: [
-            { name: 'SGOT (AST)', unit: 'U/L', reference_range: '0 - 40', min_value: 0, max_value: 40 },
-            { name: 'SGPT (ALT)', unit: 'U/L', reference_range: '0 - 41', min_value: 0, max_value: 41 },
-            { name: 'Alkaline Phosphatase', unit: 'U/L', reference_range: '44 - 147', min_value: 44, max_value: 147 },
-            { name: 'Bilirubin Total', unit: 'mg/dL', reference_range: '0.1 - 1.2', min_value: 0.1, max_value: 1.2 },
-        ],
-    });
+    for (const panelKey of ['CBC', 'LFT', 'KFT', 'FBS', 'CRP']) {
+        const cat = await prisma.testCategory.findUnique({ where: { code: panelKey } });
+        if (cat) await seedGroupedTest(cat.id, panelKey);
+    }
 
-    await seedGroupedTest(bio.id, {
-        name: 'Kidney Function Test (KFT)',
-        code: 'KFT',
-        sample_type: 'Serum',
-        price: 500,
-        method: 'Photometry',
-        parameters: [
-            { name: 'Blood Urea', unit: 'mg/dL', reference_range: '15 - 40', min_value: 15, max_value: 40 },
-            { name: 'Serum Creatinine', unit: 'mg/dL', reference_range: '0.6 - 1.3', min_value: 0.6, max_value: 1.3 },
-            { name: 'Uric Acid', unit: 'mg/dL', reference_range: '3.5 - 7.2', min_value: 3.5, max_value: 7.2 },
-        ],
-    });
-
-    await seedGroupedTest(lip.id, {
-        name: 'Lipid Profile',
-        code: 'LIPID',
-        sample_type: 'Serum',
-        price: 550,
-        method: 'Enzymatic Colorimetric',
-        parameters: [
-            { name: 'Total Cholesterol', unit: 'mg/dL', reference_range: '< 200', max_value: 200 },
-            { name: 'HDL Cholesterol', unit: 'mg/dL', reference_range: '> 40', min_value: 40 },
-            { name: 'Triglycerides', unit: 'mg/dL', reference_range: '< 150', max_value: 150 },
-        ],
+    await prisma.testParameter.deleteMany({ where: { labTest: { code: 'LIPID' } } });
+    await prisma.labTest.deleteMany({ where: { code: 'LIPID' } });
+    await prisma.labTest.create({
+        data: {
+            testCategoryId: lip.id,
+            name: 'Lipid Profile',
+            code: 'LIPID',
+            sampleType: 'Serum',
+            reportType: 'grouped',
+            price: 550,
+            method: 'Enzymatic Colorimetric',
+            status: 'active',
+            parameters: {
+                create: [
+                    { name: 'Total Cholesterol', unit: 'mg/dL', referenceRange: '< 200', maxValue: 200, sortOrder: 0, status: 'active' },
+                    { name: 'HDL Cholesterol', unit: 'mg/dL', referenceRange: '> 40', minValue: 40, sortOrder: 1, status: 'active' },
+                    { name: 'Triglycerides', unit: 'mg/dL', referenceRange: '< 150', maxValue: 150, sortOrder: 2, status: 'active' },
+                ],
+            },
+        },
     });
 
     for (const test of [
@@ -160,6 +139,8 @@ async function main() {
         { name: 'Thyroid Profile', code: 'THYROID_PROFILE', price: 700, testCodes: ['T3', 'T4', 'TSH'] },
         { name: 'Viral Marker Panel', code: 'VIRAL_MARKER', price: 1200, testCodes: ['HBSAG', 'ANTI_HCV', 'HIV'] },
         { name: 'Executive Health Package', code: 'EXEC_HEALTH', price: 1800, testCodes: ['CBC', 'LFT', 'KFT', 'LIPID'] },
+        { name: 'Diabetes Screening', code: 'DIABETES_SCREEN', price: 500, testCodes: ['FBS'] },
+        { name: 'Inflammation Panel', code: 'INFLAMMATION', price: 450, testCodes: ['CRP'] },
     ];
 
     for (const profileDef of profileDefs) {

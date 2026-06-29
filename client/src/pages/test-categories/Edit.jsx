@@ -5,7 +5,9 @@ import { Button } from 'primereact/button';
 import { InputText } from 'primereact/inputtext';
 import { InputTextarea } from 'primereact/inputtextarea';
 import { Dropdown } from 'primereact/dropdown';
+import { confirmDialog } from 'primereact/confirmdialog';
 import AppLayout from '../../components/AppLayout';
+import PageHeader from '../../components/PageHeader';
 import { testCategoryService } from '../../services/api';
 import { useToast } from '../../context/ToastContext';
 
@@ -49,10 +51,28 @@ export default function TestCategoryEdit() {
         }
     }
 
+    function confirmDelete() {
+        confirmDialog({
+            message: `Delete category "${form.name}"? Categories with linked tests cannot be deleted.`,
+            header: 'Confirm Delete',
+            icon: 'pi pi-exclamation-triangle',
+            acceptClassName: 'p-button-danger',
+            accept: async () => {
+                try {
+                    await testCategoryService.delete(id);
+                    toast.success('Category deleted successfully');
+                    navigate('/test-categories');
+                } catch (e) {
+                    toast.error(e.response?.data?.errors?.category?.[0] || e.response?.data?.message || 'Delete failed');
+                }
+            },
+        });
+    }
+
     return (
         <AppLayout>
-            <div className="page-header"><h1 className="page-title">Edit Test Category</h1></div>
-            <Card>
+            <PageHeader title="Edit Test Category" subtitle={form.name || 'Update category details'} />
+            <Card className="content-card">
                 <form onSubmit={submit}>
                     <div className="form-grid">
                         <div className="form-field">
@@ -75,6 +95,7 @@ export default function TestCategoryEdit() {
                     <div className="form-actions">
                         <Button type="submit" label="Save" icon="pi pi-check" loading={loading} />
                         <Button type="button" label="Cancel" severity="secondary" outlined onClick={() => navigate(`/test-categories/${id}`)} />
+                        <Button type="button" label="Delete" icon="pi pi-trash" severity="danger" outlined onClick={confirmDelete} />
                     </div>
                 </form>
             </Card>

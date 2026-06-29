@@ -6,10 +6,13 @@
   "scripts": {
     "dev": "node --watch src/server.js",
     "start": "node src/server.js",
+    "build": "node scripts/prisma-cli.mjs generate && node scripts/install-puppeteer-chrome.mjs",
     "db:push": "node scripts/prisma-cli.mjs db push",
     "db:migrate": "node scripts/prisma-cli.mjs db push",
     "db:generate": "node scripts/prisma-cli.mjs generate",
     "db:seed": "node prisma/seed.js",
+    "db:sync-cbc": "node scripts/sync-cbc-parameters.mjs",
+    "db:sync-panels": "node scripts/sync-all-panels.mjs",
     "db:studio": "prisma studio",
     "browsers:install": "node scripts/install-puppeteer-chrome.mjs",
     "postinstall": "prisma generate"

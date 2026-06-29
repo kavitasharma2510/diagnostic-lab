@@ -24,7 +24,8 @@ export default function PatientView() {
                     <p className="text-muted">{item.patient_no}</p>
                 </div>
                 <div style={{ display: 'flex', gap: '0.5rem' }}>
-                    <Button label="Create Bill" icon="pi pi-file" onClick={() => navigate(`/bills/create?patient_id=${id}`)} />
+                    <Button label="Add Tests" icon="pi pi-plus" onClick={() => navigate(`/booking?patient_id=${id}`)} />
+                    <Button label="Create Bill" icon="pi pi-file" severity="secondary" outlined onClick={() => navigate(`/bills/create?patient_id=${id}`)} />
                     <Button label="Edit" icon="pi pi-pencil" onClick={() => navigate(`/patients/${id}/edit`)} />
                     <Button label="Back" severity="secondary" outlined onClick={() => navigate('/patients')} />
                 </div>

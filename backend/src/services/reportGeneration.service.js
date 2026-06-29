@@ -8,6 +8,7 @@ import { serialize } from '../utils/serialize.js';
 import { parseId } from '../utils/parseId.js';
 import { detectFlag } from '../utils/flagDetector.js';
 import { generateReportPdf, labConfig, REPORTS_DIR } from '../templates/reportPdfTemplate.js';
+import { sortRowsByPanelSequence, resolvePanelKey } from '../constants/panelSequences.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -73,16 +74,64 @@ async function generateReportNo(db = prisma) {
     return `${prefix}-${String(sequence).padStart(4, '0')}`;
 }
 
+function normalizeReportTestOrder(reportTests) {
+    const ordered = [...reportTests].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+    const byLabTest = {};
+
+    for (const rt of ordered) {
+        const id = rt.labTestId || rt.id;
+        if (!byLabTest[id]) byLabTest[id] = [];
+        byLabTest[id].push(rt);
+    }
+
+    const seen = new Set();
+    const result = [];
+
+    for (const rt of ordered) {
+        const id = rt.labTestId || rt.id;
+        if (seen.has(id)) continue;
+        seen.add(id);
+
+        const rows = byLabTest[id];
+        const panelKey = resolvePanelKey(rt.labTest?.code)
+            || resolvePanelKey(rt.labTest?.category?.code);
+        result.push(...(panelKey ? sortRowsByPanelSequence(rows, panelKey) : rows));
+    }
+
+    return result;
+}
+
+function orderGroupedParameters(labTest) {
+    const params = [...labTest.parameters].sort(
+        (a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0),
+    );
+    const panelKey = resolvePanelKey(labTest.code) || resolvePanelKey(labTest.category?.code);
+    if (!panelKey) return params;
+
+    const byName = Object.fromEntries(params.map((p) => [p.name, p]));
+    return sortRowsByPanelSequence(
+        params.map((p) => ({ testName: p.name, sortOrder: p.sortOrder })),
+        panelKey,
+    )
+        .map((row) => byName[row.testName])
+        .filter(Boolean);
+}
+
 function buildTestRows(billTests) {
     const rows = [];
     let sortOrder = 0;
 
-    for (const bt of billTests) {
+    const orderedBillTests = [...billTests].sort(
+        (a, b) => new Date(a.createdAt) - new Date(b.createdAt),
+    );
+
+    for (const bt of orderedBillTests) {
         const labTest = bt.labTest;
         if (!labTest) continue;
 
         if (labTest.reportType === 'grouped' && labTest.parameters?.length) {
-            for (const param of labTest.parameters) {
+            const orderedParams = orderGroupedParameters(labTest);
+            for (const param of orderedParams) {
                 rows.push({
                     labTestId: labTest.id,
                     profileId: bt.profileId,
@@ -206,6 +255,7 @@ export const reportGenerationService = {
                 patient: true,
                 billTests: {
                     where: { status: { in: ['collected', 'completed'] } },
+                    orderBy: { createdAt: 'asc' },
                     include: {
                         labTest: {
                             include: {
@@ -262,6 +312,7 @@ export const reportGenerationService = {
         });
 
         if (!report) throw new AppError('Report not found', 404);
+        report.reportTests = normalizeReportTestOrder(report.reportTests);
         return mapReport(report);
     },
 
@@ -324,7 +375,8 @@ export const reportGenerationService = {
                 where: { id: item.id },
                 data: {
                     resultValue: item.result_value ?? null,
-                    remarks: item.remarks ?? existing.remarks,
+                    unit: item.unit !== undefined ? item.unit : existing.unit,
+                    referenceRange: item.reference_range !== undefined ? item.reference_range : existing.referenceRange,
                     flag,
                 },
             });
@@ -358,12 +410,7 @@ export const reportGenerationService = {
             });
         }
 
-        const samples = await prisma.sample.findMany({
-            where: { billId: report.billId, status: { in: ['collected', 'processing', 'completed'] } },
-            orderBy: { collectedAt: 'asc' },
-        });
-
-        const pdfPath = await generateReportPdf(report, samples);
+        const pdfPath = await this.createPdfForReport(report);
 
         await prisma.labReport.update({
             where: { id: parseId(id) },
@@ -383,6 +430,40 @@ export const reportGenerationService = {
         return this.getById(id);
     },
 
+    async createPdfForReport(report) {
+        const samples = await prisma.sample.findMany({
+            where: { billId: report.billId, status: { in: ['collected', 'processing', 'completed'] } },
+            orderBy: { collectedAt: 'asc' },
+            include: { collectedBy: { select: { name: true } } },
+        });
+        return generateReportPdf(report, samples);
+    },
+
+    async ensurePdfFile(report) {
+        if (!['approved', 'generated'].includes(report.status)) {
+            throw new AppError('PDF not generated yet. Approve the report first.', 404);
+        }
+
+        try {
+            const pdfPath = await this.createPdfForReport(report);
+
+            await prisma.labReport.update({
+                where: { id: report.id },
+                data: { pdfPath },
+            });
+
+            const filePath = path.join(REPORTS_DIR, path.basename(pdfPath));
+            return { filePath, relative: pdfPath };
+        } catch (err) {
+            throw new AppError(
+                err.message?.includes('Chrome not found')
+                    ? 'PDF generation failed: Chrome not installed on server. Run: npm run browsers:install -w backend'
+                    : `PDF generation failed: ${err.message || 'Unknown error'}`,
+                500,
+            );
+        }
+    },
+
     getPdfFilePath(report) {
         if (!report.pdfPath && !report.pdf_path) {
             throw new AppError('PDF not generated yet. Approve the report first.', 404);
@@ -399,8 +480,12 @@ export const reportGenerationService = {
     },
 
     async getDownload(id) {
-        const report = await this.getById(id);
-        return this.getPdfFilePath(report);
+        const report = await prisma.labReport.findUnique({
+            where: { id: parseId(id) },
+            include: reportInclude,
+        });
+        if (!report) throw new AppError('Report not found', 404);
+        return this.ensurePdfFile(report);
     },
 
     getPublicPdfUrl(report) {

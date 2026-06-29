@@ -11,7 +11,10 @@ import './index.css';
 
 ReactDOM.createRoot(document.getElementById('root')).render(
     <React.StrictMode>
-        <PrimeReactProvider>
+        <PrimeReactProvider value={{
+            ripple: true,
+            inputStyle: 'outlined',
+        }}>
             <BrowserRouter>
                 <App />
             </BrowserRouter>

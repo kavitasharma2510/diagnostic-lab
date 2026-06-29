@@ -5,28 +5,52 @@ import { Button } from 'primereact/button';
 import { DataTable } from 'primereact/datatable';
 import { Column } from 'primereact/column';
 import { Tag } from 'primereact/tag';
+import { confirmDialog } from 'primereact/confirmdialog';
 import AppLayout from '../../components/AppLayout';
+import PageHeader from '../../components/PageHeader';
+import PageLoader from '../../components/PageLoader';
 import StatusBadge from '../../components/StatusBadge';
 import { labTestService } from '../../services/api';
+import { useToast } from '../../context/ToastContext';
 
 export default function LabTestView() {
     const { id } = useParams();
     const navigate = useNavigate();
+    const toast = useToast();
     const [item, setItem] = useState(null);
 
     useEffect(() => {
         labTestService.get(id).then(({ data }) => setItem(data.data)).catch(() => navigate('/lab-tests'));
     }, [id, navigate]);
 
-    if (!item) return <AppLayout><p>Loading...</p></AppLayout>;
+    if (!item) return <AppLayout><PageLoader /></AppLayout>;
+
+    function confirmDelete() {
+        confirmDialog({
+            message: `Delete test "${item.name}"? This cannot be undone.`,
+            header: 'Confirm Delete',
+            icon: 'pi pi-exclamation-triangle',
+            acceptClassName: 'p-button-danger',
+            accept: async () => {
+                try {
+                    await labTestService.delete(id);
+                    toast.success('Test deleted successfully');
+                    navigate('/lab-tests');
+                } catch (e) {
+                    toast.error(e.response?.data?.errors?.test?.[0] || e.response?.data?.message || 'Delete failed');
+                }
+            },
+        });
+    }
 
     return (
         <AppLayout>
-            <div className="page-header">
-                <div><h1 className="page-title">{item.name}</h1><p className="text-muted">{item.code}</p></div>
-                <Button label="Edit" onClick={() => navigate(`/lab-tests/${id}/edit`)} />
-            </div>
-            <Card>
+            <PageHeader title={item.name} subtitle={item.code}>
+                <Button label="Edit" icon="pi pi-pencil" onClick={() => navigate(`/lab-tests/${id}/edit`)} />
+                <Button label="Delete" icon="pi pi-trash" severity="danger" outlined onClick={confirmDelete} />
+                <Button label="Back" severity="secondary" outlined onClick={() => navigate('/lab-tests')} />
+            </PageHeader>
+            <Card className="content-card">
                 <div className="detail-grid">
                     <div className="detail-item"><label>Category</label><p>{item.category?.name}</p></div>
                     <div className="detail-item"><label>Sample</label><p>{item.sample_type}</p></div>

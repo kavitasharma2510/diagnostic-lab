@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card } from 'primereact/card';
 import { Button } from 'primereact/button';
 import { DataTable } from 'primereact/datatable';
 import { Column } from 'primereact/column';
@@ -8,7 +7,10 @@ import { InputText } from 'primereact/inputtext';
 import { Dropdown } from 'primereact/dropdown';
 import { Tag } from 'primereact/tag';
 import { Badge } from 'primereact/badge';
+import { confirmDialog } from 'primereact/confirmdialog';
 import AppLayout from '../../components/AppLayout';
+import PageHeader from '../../components/PageHeader';
+import TableActions from '../../components/TableActions';
 import StatusBadge from '../../components/StatusBadge';
 import { labTestService, testCategoryService } from '../../services/api';
 import { useToast } from '../../context/ToastContext';
@@ -46,14 +48,33 @@ export default function LabTestList() {
         load();
     }, [filters.page, filters.per_page, filters.status, filters.test_category_id]);
 
+    function confirmDelete(row) {
+        confirmDialog({
+            message: `Delete test "${row.name}"? This cannot be undone.`,
+            header: 'Confirm Delete',
+            icon: 'pi pi-exclamation-triangle',
+            acceptClassName: 'p-button-danger',
+            accept: async () => {
+                try {
+                    await labTestService.delete(row.id);
+                    toast.success('Test deleted successfully');
+                    load();
+                } catch (e) {
+                    toast.error(e.response?.data?.errors?.test?.[0] || e.response?.data?.message || 'Delete failed');
+                }
+            },
+        });
+    }
+
     return (
         <AppLayout>
-            <div className="page-header">
-                <div><h1 className="page-title">Test Master</h1><p className="text-muted">React frontend</p></div>
-                <Button label="Add Test" icon="pi pi-plus" onClick={() => navigate('/lab-tests/create')} />
-            </div>
-            <Card>
-                <div className="filter-bar">
+            <PageHeader
+                title="Lab Tests"
+                subtitle="Add and manage grouped tests under each category"
+                actionLabel="Add Test"
+                onAction={() => navigate('/lab-tests/create')}
+            />
+            <div className="filter-bar">
                     <InputText placeholder="Search" value={filters.search} onChange={(e) => setFilters({ ...filters, search: e.target.value })} onKeyDown={(e) => e.key === 'Enter' && load()} />
                     <Dropdown value={filters.test_category_id} options={categories} optionLabel="name" optionValue="id" onChange={(e) => setFilters({ ...filters, test_category_id: e.value, page: 1 })} />
                     <Button label="Search" onClick={load} />
@@ -67,13 +88,15 @@ export default function LabTestList() {
                     <Column header="Params" body={(r) => <Badge value={r.parameters_count || 0} />} />
                     <Column header="Status" body={(r) => <StatusBadge status={r.status} />} />
                     <Column header="Actions" body={(r) => (
-                        <div style={{ display: 'flex', gap: '0.25rem' }}>
-                            <Button icon="pi pi-eye" text onClick={() => navigate(`/lab-tests/${r.id}`)} />
-                            <Button icon="pi pi-pencil" text onClick={() => navigate(`/lab-tests/${r.id}/edit`)} />
-                        </div>
+                        <TableActions
+                            actions={[
+                                { title: 'View', icon: 'pi pi-eye', onClick: () => navigate(`/lab-tests/${r.id}`) },
+                                { title: 'Edit', icon: 'pi pi-pencil', onClick: () => navigate(`/lab-tests/${r.id}/edit`) },
+                                { title: 'Delete', icon: 'pi pi-trash', onClick: () => confirmDelete(r) },
+                            ]}
+                        />
                     )} />
                 </DataTable>
-            </Card>
         </AppLayout>
     );
 }

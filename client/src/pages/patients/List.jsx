@@ -71,7 +71,7 @@ export default function PatientList() {
                     <h1 className="page-title">Patients</h1>
                     <p className="text-muted">Patient registration</p>
                 </div>
-                <Button label="Register Patient" icon="pi pi-plus" onClick={() => navigate('/patients/create')} />
+                <Button label="Register Patient" icon="pi pi-plus" onClick={() => navigate('/booking')} />
             </div>
             <Card>
                 <div className="filter-bar">

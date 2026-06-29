@@ -6,6 +6,7 @@ import { InputText } from 'primereact/inputtext';
 import { InputTextarea } from 'primereact/inputtextarea';
 import { Dropdown } from 'primereact/dropdown';
 import AppLayout from '../../components/AppLayout';
+import PageHeader from '../../components/PageHeader';
 import { testCategoryService } from '../../services/api';
 import { useToast } from '../../context/ToastContext';
 
@@ -43,8 +44,8 @@ export default function TestCategoryCreate() {
 
     return (
         <AppLayout>
-            <div className="page-header"><h1 className="page-title">Create Test Category</h1></div>
-            <Card>
+            <PageHeader title="Create Test Category" subtitle="Step 1 — Add a new test category" />
+            <Card className="content-card">
                 <form onSubmit={submit}>
                     <div className="form-grid">
                         <div className="form-field">

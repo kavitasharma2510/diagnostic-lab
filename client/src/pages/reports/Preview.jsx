@@ -2,7 +2,10 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Card } from 'primereact/card';
 import { Button } from 'primereact/button';
+import { ProgressSpinner } from 'primereact/progressspinner';
 import AppLayout from '../../components/AppLayout';
+import PageHeader from '../../components/PageHeader';
+import PageLoader from '../../components/PageLoader';
 import { reportService } from '../../services/api';
 import { useToast } from '../../context/ToastContext';
 
@@ -11,10 +14,39 @@ export default function ReportPreview() {
     const navigate = useNavigate();
     const toast = useToast();
     const [report, setReport] = useState(null);
+    const [pdfUrl, setPdfUrl] = useState(null);
+    const [pdfLoading, setPdfLoading] = useState(false);
+    const [pdfError, setPdfError] = useState(null);
+    const [pdfRetryKey, setPdfRetryKey] = useState(0);
 
     useEffect(() => {
         reportService.get(id).then(({ data }) => setReport(data.data)).catch(() => navigate('/reports'));
-    }, [id]);
+    }, [id, navigate]);
+
+    useEffect(() => {
+        if (!report || report.status !== 'approved') return undefined;
+
+        let objectUrl;
+        setPdfLoading(true);
+        setPdfError(null);
+
+        fetch(reportService.previewUrl(id))
+            .then(async (res) => {
+                if (!res.ok) {
+                    const body = await res.json().catch(() => ({}));
+                    throw new Error(body.message || 'Failed to load PDF');
+                }
+                const blob = await res.blob();
+                objectUrl = URL.createObjectURL(blob);
+                setPdfUrl(objectUrl);
+            })
+            .catch((e) => setPdfError(e.message || 'Failed to load PDF'))
+            .finally(() => setPdfLoading(false));
+
+        return () => {
+            if (objectUrl) URL.revokeObjectURL(objectUrl);
+        };
+    }, [id, report, pdfRetryKey]);
 
     async function shareWhatsApp() {
         try {
@@ -25,29 +57,31 @@ export default function ReportPreview() {
         }
     }
 
-    if (!report) return <AppLayout><p>Loading...</p></AppLayout>;
+    if (!report) return <AppLayout><PageLoader message="Loading report..." /></AppLayout>;
 
     return (
         <AppLayout>
-            <div className="page-header">
-                <div>
-                    <h1 className="page-title">Report Preview</h1>
-                    <p className="text-muted">{report.report_no}</p>
-                </div>
-                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                    <Button label="Download PDF" icon="pi pi-download" onClick={() => window.open(reportService.downloadUrl(id), '_blank')} />
-                    <Button label="WhatsApp Share" icon="pi pi-whatsapp" severity="success" onClick={shareWhatsApp} />
-                    <Button label="Edit Results" icon="pi pi-pencil" outlined onClick={() => navigate(`/reports/entry/${id}`)} />
-                    <Button label="Back" severity="secondary" outlined onClick={() => navigate('/reports')} />
-                </div>
-            </div>
-            <Card>
+            <PageHeader title="Report Preview" subtitle={report.report_no}>
+                <Button label="Download PDF" icon="pi pi-download" onClick={() => window.open(reportService.downloadUrl(id), '_blank')} />
+                <Button label="WhatsApp Share" icon="pi pi-whatsapp" severity="success" onClick={shareWhatsApp} />
+                <Button label="Edit Results" icon="pi pi-pencil" outlined onClick={() => navigate(`/reports/entry/${id}`)} />
+                <Button label="Back" severity="secondary" outlined onClick={() => navigate('/reports')} />
+            </PageHeader>
+            <Card className="content-card">
                 {report.status === 'approved' ? (
-                    <iframe
-                        title="Report PDF"
-                        src={reportService.previewUrl(id)}
-                        style={{ width: '100%', height: '80vh', border: '1px solid #e2e8f0' }}
-                    />
+                    pdfLoading ? (
+                        <div className="pdf-preview-loading">
+                            <ProgressSpinner />
+                            <p className="text-muted">Generating report PDF…</p>
+                        </div>
+                    ) : pdfError ? (
+                        <div className="pdf-preview-error">
+                            <p>{pdfError}</p>
+                            <Button label="Retry" icon="pi pi-refresh" onClick={() => setPdfRetryKey((k) => k + 1)} />
+                        </div>
+                    ) : pdfUrl ? (
+                        <iframe title="Report PDF" src={pdfUrl} className="pdf-preview-frame" />
+                    ) : null
                 ) : (
                     <p className="text-muted">Approve the report to generate and preview the PDF.</p>
                 )}

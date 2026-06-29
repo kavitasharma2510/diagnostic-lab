@@ -5,8 +5,8 @@ import { Button } from 'primereact/button';
 import { InputText } from 'primereact/inputtext';
 import { InputTextarea } from 'primereact/inputtextarea';
 import { InputNumber } from 'primereact/inputnumber';
-import { PickList } from 'primereact/picklist';
 import AppLayout from '../../components/AppLayout';
+import ProfileTestPicker from '../../components/profiles/ProfileTestPicker';
 import { profileService, labTestService } from '../../services/api';
 import { useToast } from '../../context/ToastContext';
 
@@ -19,7 +19,7 @@ export default function ProfileEdit() {
     const [form, setForm] = useState({ name: '', code: '', price: 0, description: '', status: 'active' });
 
     useEffect(() => {
-        labTestService.list({ per_page: 200, status: 'active' }).then(async ({ data }) => {
+        labTestService.list({ per_page: 500, status: 'active' }).then(async ({ data }) => {
             const all = data.data;
             const profile = (await profileService.get(id)).data.data;
             setForm({
@@ -63,16 +63,10 @@ export default function ProfileEdit() {
                     </div>
                     <div style={{ marginTop: '1.5rem' }}>
                         <h3>Select & Order Tests</h3>
-                        <p className="text-muted">Move tests to the right — order is saved as profile test order.</p>
-                        <PickList
+                        <ProfileTestPicker
                             source={pickList[0]}
                             target={pickList[1]}
-                            onChange={(e) => setPickList([e.source, e.target])}
-                            itemTemplate={(item) => <div><strong>{item.name}</strong><div className="text-muted">{item.code}</div></div>}
-                            sourceHeader="Available"
-                            targetHeader="Selected"
-                            filter
-                            filterBy="name,code"
+                            onChange={(source, target) => setPickList([source, target])}
                         />
                     </div>
                     <div className="form-actions">

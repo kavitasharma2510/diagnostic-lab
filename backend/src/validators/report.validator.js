@@ -7,7 +7,8 @@ export const saveResultsSchema = z.object({
     results: z.array(z.object({
         id: objectIdSchema,
         result_value: z.string().optional().nullable(),
-        remarks: z.string().optional().nullable(),
+        unit: z.string().optional().nullable(),
+        reference_range: z.string().optional().nullable(),
         min_value: z.coerce.number().optional().nullable(),
         max_value: z.coerce.number().optional().nullable(),
     })).min(1),

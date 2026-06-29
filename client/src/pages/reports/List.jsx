@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card } from 'primereact/card';
 import { Button } from 'primereact/button';
 import { DataTable } from 'primereact/datatable';
 import { Column } from 'primereact/column';
@@ -8,6 +7,8 @@ import { InputText } from 'primereact/inputtext';
 import { Dropdown } from 'primereact/dropdown';
 import { Tag } from 'primereact/tag';
 import AppLayout from '../../components/AppLayout';
+import PageHeader from '../../components/PageHeader';
+import TableActions from '../../components/TableActions';
 import { reportService } from '../../services/api';
 import { useToast } from '../../context/ToastContext';
 
@@ -59,15 +60,11 @@ export default function ReportList() {
 
     return (
         <AppLayout>
-            <div className="page-header">
-                <div>
-                    <h1 className="page-title">Reports</h1>
-                    <p className="text-muted">View, preview, and share pathology reports</p>
-                </div>
-                <Button label="Result Entry" icon="pi pi-pencil" onClick={() => navigate('/reports/entry')} />
-            </div>
-            <Card>
-                <div className="filter-bar">
+            <PageHeader
+                title="Reports"
+                subtitle="Enter results, approve reports, and download PDFs"
+            />
+            <div className="filter-bar">
                     <InputText placeholder="Search report, patient, bill" value={filters.search} onChange={(e) => setFilters({ ...filters, search: e.target.value })} onKeyDown={(e) => e.key === 'Enter' && load()} />
                     <Dropdown value={filters.status} options={statusOptions} onChange={(e) => setFilters({ ...filters, status: e.value, page: 1 })} placeholder="Status" />
                     <Button label="Search" icon="pi pi-search" onClick={load} />
@@ -89,19 +86,22 @@ export default function ReportList() {
                     <Column header="Status" body={(r) => <Tag value={r.status} severity={statusSeverity[r.status]} />} />
                     <Column header="Prepared" body={(r) => r.prepared_at ? new Date(r.prepared_at).toLocaleString() : '—'} />
                     <Column header="Actions" body={(r) => (
-                        <div style={{ display: 'flex', gap: '0.25rem' }}>
-                            <Button icon="pi pi-pencil" text title="Edit Results" onClick={() => navigate(`/reports/entry/${r.id}`)} />
-                            {r.status === 'approved' && (
-                                <>
-                                    <Button icon="pi pi-eye" text title="Preview" onClick={() => navigate(`/reports/${r.id}/preview`)} />
-                                    <Button icon="pi pi-download" text title="Download" onClick={() => window.open(reportService.downloadUrl(r.id), '_blank')} />
-                                    <Button icon="pi pi-whatsapp" text severity="success" title="WhatsApp" onClick={() => shareWhatsApp(r.id)} />
-                                </>
-                            )}
-                        </div>
+                        <TableActions
+                            actions={[
+                                ...(r.status === 'draft' ? [{
+                                    title: 'Enter Results',
+                                    icon: 'pi pi-pencil',
+                                    onClick: () => navigate(`/reports/entry/${r.id}`),
+                                }] : []),
+                                ...(r.status === 'approved' ? [
+                                    { title: 'Preview', icon: 'pi pi-eye', onClick: () => navigate(`/reports/${r.id}/preview`) },
+                                    { title: 'Download', icon: 'pi pi-download', onClick: () => window.open(reportService.downloadUrl(r.id), '_blank') },
+                                    { title: 'WhatsApp', icon: 'pi pi-whatsapp', onClick: () => shareWhatsApp(r.id) },
+                                ] : []),
+                            ]}
+                        />
                     )} />
                 </DataTable>
-            </Card>
         </AppLayout>
     );
 }
