@@ -18,12 +18,28 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 const port = process.env.PORT || 5000;
 
-app.use(cors({
-    origin: [
-        process.env.CLIENT_URL || 'http://localhost:3000',
-        'http://localhost:3001',
+function getAllowedOrigins() {
+    const defaults = [
         'http://localhost:3000',
-    ],
+        'http://localhost:3001',
+        'http://localhost:3002',
+        'https://diagnostic-lab-client.vercel.app',
+    ];
+
+    if (!process.env.CLIENT_URL) {
+        return defaults;
+    }
+
+    const fromEnv = process.env.CLIENT_URL
+        .split(',')
+        .map((url) => url.trim())
+        .filter(Boolean);
+
+    return [...new Set([...fromEnv, ...defaults])];
+}
+
+app.use(cors({
+    origin: getAllowedOrigins(),
     credentials: true,
 }));
 app.use(express.json());
