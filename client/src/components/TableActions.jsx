@@ -6,6 +6,7 @@ export default function TableActions({ actions = [] }) {
             {actions.map((action) => (
                 <Button
                     key={action.key || action.title}
+                    type="button"
                     icon={action.icon}
                     text
                     className="table-action-btn"

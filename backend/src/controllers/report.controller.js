@@ -58,4 +58,9 @@ export const reportController = {
         const data = await whatsappShareService.getShareLink(req.params.id);
         res.json({ data });
     },
+
+    async remove(req, res) {
+        await reportGenerationService.remove(req.params.id);
+        res.status(204).send();
+    },
 };

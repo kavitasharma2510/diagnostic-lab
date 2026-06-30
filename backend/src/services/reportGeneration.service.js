@@ -9,6 +9,7 @@ import { parseId } from '../utils/parseId.js';
 import { detectFlag } from '../utils/flagDetector.js';
 import { generateReportPdf, labConfig, REPORTS_DIR } from '../templates/reportPdfTemplate.js';
 import { sortRowsByPanelSequence, resolvePanelKey } from '../constants/panelSequences.js';
+import { isWidalCode, isWidalResultComplete } from '../constants/widalFormat.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -388,7 +389,9 @@ export const reportGenerationService = {
             const param = labTest?.parameters?.find((p) => p.name === existing.testName);
             const minValue = item.min_value ?? param?.minValue ?? labTest?.minValue;
             const maxValue = item.max_value ?? param?.maxValue ?? labTest?.maxValue;
-            const flag = detectFlag(item.result_value, minValue, maxValue);
+            const flag = isWidalCode(labTest?.code)
+                ? null
+                : detectFlag(item.result_value, minValue, maxValue);
 
             await prisma.labReportTest.update({
                 where: { id: item.id },
@@ -422,7 +425,12 @@ export const reportGenerationService = {
 
         if (!report) throw new AppError('Report not found', 404);
 
-        const emptyResults = report.reportTests.filter((rt) => !rt.resultValue?.trim());
+        const emptyResults = report.reportTests.filter((rt) => {
+            if (isWidalCode(rt.labTest?.code)) {
+                return !isWidalResultComplete(rt.resultValue);
+            }
+            return !rt.resultValue?.trim();
+        });
         if (emptyResults.length) {
             throw new AppError('Enter all test results before approval.', 422, {
                 missing: emptyResults.map((r) => r.testName),
@@ -510,5 +518,29 @@ export const reportGenerationService = {
         const reportId = report.id;
         if (!reportId) return null;
         return `${base}/api/reports/${reportId}/download`;
+    },
+
+    async remove(id) {
+        const report = await prisma.labReport.findUnique({
+            where: { id: parseId(id) },
+        });
+
+        if (!report) throw new AppError('Report not found', 404);
+
+        if (report.pdfPath) {
+            const filePath = path.join(REPORTS_DIR, path.basename(report.pdfPath));
+            if (fs.existsSync(filePath)) {
+                fs.unlinkSync(filePath);
+            }
+        }
+
+        if (report.status === 'approved') {
+            await prisma.billTest.updateMany({
+                where: { billId: report.billId, status: 'completed' },
+                data: { status: 'collected' },
+            });
+        }
+
+        await prisma.labReport.delete({ where: { id: report.id } });
     },
 };

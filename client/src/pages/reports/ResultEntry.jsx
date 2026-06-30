@@ -12,6 +12,8 @@ import AppLayout from '../../components/AppLayout';
 import PageHeader from '../../components/PageHeader';
 import { reportService } from '../../services/api';
 import { useToast } from '../../context/ToastContext';
+import WidalResultGrid from '../../components/WidalResultGrid';
+import { isWidalReportRow, WIDAL_DEFAULT_ANTIGENS } from '../../utils/widal';
 
 function buildResultPayload(results) {
     return results.map((r) => ({
@@ -49,6 +51,10 @@ export default function ResultEntry() {
                 return {
                     id: rt.id,
                     test_name: rt.test_name,
+                    lab_test_id: rt.lab_test_id,
+                    lab_test_code: rt.lab_test?.code || '',
+                    category_code: rt.lab_test?.category?.code || '',
+                    lab_test: rt.lab_test,
                     result_value: rt.result_value || '',
                     unit: rt.unit || '',
                     reference_range: rt.reference_range || '',
@@ -65,6 +71,21 @@ export default function ResultEntry() {
     function updateResult(rowId, field, value) {
         setResults((prev) => prev.map((r) => (r.id === rowId ? { ...r, [field]: value } : r)));
     }
+
+    function updateWidalResult(rowId, serializedValue) {
+        setResults((prev) => prev.map((r) => (
+            r.id === rowId ? { ...r, result_value: serializedValue } : r
+        )));
+    }
+
+    const widalResults = results
+        .filter((r) => isWidalReportRow(r, results))
+        .sort((a, b) => {
+            const ai = WIDAL_DEFAULT_ANTIGENS.findIndex((n) => n.toLowerCase() === a.test_name?.toLowerCase());
+            const bi = WIDAL_DEFAULT_ANTIGENS.findIndex((n) => n.toLowerCase() === b.test_name?.toLowerCase());
+            return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+        });
+    const standardResults = results.filter((r) => !isWidalReportRow(r, results));
 
     async function saveDraft() {
         if (!report) return;
@@ -150,42 +171,51 @@ export default function ResultEntry() {
             </Card>
 
             <Card title="Test Results" className="content-card mb-3">
-                <DataTable value={results} dataKey="id">
-                    <Column field="test_name" header="Test / Parameter" />
-                    <Column
-                        header="Result"
-                        body={(r) => (
-                            <InputText
-                                value={r.result_value}
-                                onChange={(e) => updateResult(r.id, 'result_value', e.target.value)}
-                                disabled={isApproved}
-                                className="w-full"
-                            />
-                        )}
+                {widalResults.length > 0 && (
+                    <WidalResultGrid
+                        rows={widalResults}
+                        onChange={updateWidalResult}
+                        disabled={isApproved}
                     />
-                    <Column
-                        header="Unit"
-                        body={(r) => (
-                            <InputText
-                                value={r.unit}
-                                onChange={(e) => updateResult(r.id, 'unit', e.target.value)}
-                                disabled={isApproved}
-                                className="w-full"
-                            />
-                        )}
-                    />
-                    <Column
-                        header="Reference Range"
-                        body={(r) => (
-                            <InputText
-                                value={r.reference_range}
-                                onChange={(e) => updateResult(r.id, 'reference_range', e.target.value)}
-                                disabled={isApproved}
-                                className="w-full"
-                            />
-                        )}
-                    />
-                </DataTable>
+                )}
+                {standardResults.length > 0 && (
+                    <DataTable value={standardResults} dataKey="id">
+                        <Column field="test_name" header="Test / Parameter" />
+                        <Column
+                            header="Result"
+                            body={(r) => (
+                                <InputText
+                                    value={r.result_value}
+                                    onChange={(e) => updateResult(r.id, 'result_value', e.target.value)}
+                                    disabled={isApproved}
+                                    className="w-full"
+                                />
+                            )}
+                        />
+                        <Column
+                            header="Unit"
+                            body={(r) => (
+                                <InputText
+                                    value={r.unit}
+                                    onChange={(e) => updateResult(r.id, 'unit', e.target.value)}
+                                    disabled={isApproved}
+                                    className="w-full"
+                                />
+                            )}
+                        />
+                        <Column
+                            header="Reference Range"
+                            body={(r) => (
+                                <InputText
+                                    value={r.reference_range}
+                                    onChange={(e) => updateResult(r.id, 'reference_range', e.target.value)}
+                                    disabled={isApproved}
+                                    className="w-full"
+                                />
+                            )}
+                        />
+                    </DataTable>
+                )}
             </Card>
 
             <Card title="Report Remarks">

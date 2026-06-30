@@ -9,6 +9,8 @@ import AppLayout from '../../components/AppLayout';
 import PageHeader from '../../components/PageHeader';
 import { labTestService, testCategoryService } from '../../services/api';
 import { useToast } from '../../context/ToastContext';
+import WidalParameterEditor from '../../components/WidalParameterEditor';
+import { buildDefaultWidalParameters, isWidalCode } from '../../utils/widal';
 
 const emptyParam = () => ({ name: '', unit: '', reference_range: '', min_value: null, max_value: null, method: '', sort_order: 0, status: 'active' });
 
@@ -26,6 +28,12 @@ export default function LabTestCreate() {
     useEffect(() => {
         testCategoryService.list({ per_page: 100, status: 'active' }).then(({ data }) => setCategories(data.data));
     }, []);
+
+    useEffect(() => {
+        if (isWidalCode(form.code) && form.report_type === 'grouped') {
+            setParameters(buildDefaultWidalParameters());
+        }
+    }, [form.code, form.report_type]);
 
     async function submit(e) {
         e.preventDefault();
@@ -61,6 +69,14 @@ export default function LabTestCreate() {
                         <div className="form-field"><label>Price</label><InputNumber value={form.price} onValueChange={(e) => setForm({ ...form, price: e.value })} mode="currency" currency="INR" locale="en-IN" /></div>
                     </div>
                     {form.report_type === 'grouped' && (
+                        isWidalCode(form.code) ? (
+                            <div style={{ marginTop: '1.5rem' }}>
+                                <WidalParameterEditor
+                                    parameters={parameters.length ? parameters : buildDefaultWidalParameters()}
+                                    onChange={setParameters}
+                                />
+                            </div>
+                        ) : (
                         <div style={{ marginTop: '1.5rem' }}>
                             <div className="param-section-header">
                                 <h3>Parameters</h3>
@@ -77,6 +93,7 @@ export default function LabTestCreate() {
                                 </div>
                             ))}
                         </div>
+                        )
                     )}
                     <div className="form-actions">
                         <Button type="submit" label="Save" loading={loading} />

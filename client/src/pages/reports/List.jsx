@@ -6,6 +6,7 @@ import { Column } from 'primereact/column';
 import { InputText } from 'primereact/inputtext';
 import { Dropdown } from 'primereact/dropdown';
 import { Tag } from 'primereact/tag';
+import { confirmDialog } from 'primereact/confirmdialog';
 import AppLayout from '../../components/AppLayout';
 import PageHeader from '../../components/PageHeader';
 import TableActions from '../../components/TableActions';
@@ -58,6 +59,24 @@ export default function ReportList() {
         }
     }
 
+    function confirmDelete(row) {
+        confirmDialog({
+            message: `Delete report "${row.report_no}"? This cannot be undone.`,
+            header: 'Confirm Delete',
+            icon: 'pi pi-exclamation-triangle',
+            acceptClassName: 'p-button-danger',
+            accept: async () => {
+                try {
+                    await reportService.delete(row.id);
+                    toast.success('Report deleted successfully');
+                    load();
+                } catch (e) {
+                    toast.error(e.response?.data?.message || 'Delete failed');
+                }
+            },
+        });
+    }
+
     return (
         <AppLayout>
             <PageHeader
@@ -98,6 +117,7 @@ export default function ReportList() {
                                     { title: 'Download', icon: 'pi pi-download', onClick: () => window.open(reportService.downloadUrl(r.id), '_blank') },
                                     { title: 'WhatsApp', icon: 'pi pi-whatsapp', onClick: () => shareWhatsApp(r.id) },
                                 ] : []),
+                                { title: 'Delete', icon: 'pi pi-trash', onClick: () => confirmDelete(r) },
                             ]}
                         />
                     )} />

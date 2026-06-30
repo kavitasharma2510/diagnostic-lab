@@ -14,6 +14,7 @@ import TableActions from '../../components/TableActions';
 import StatusBadge from '../../components/StatusBadge';
 import { labTestService, testCategoryService } from '../../services/api';
 import { useToast } from '../../context/ToastContext';
+import { isWidalCode } from '../../utils/widal';
 
 export default function LabTestList() {
     const navigate = useNavigate();
@@ -85,7 +86,11 @@ export default function LabTestList() {
                     <Column header="Category" body={(r) => r.category?.name} />
                     <Column field="sample_type" header="Sample" />
                     <Column header="Type" body={(r) => <Tag value={r.report_type} />} />
-                    <Column header="Params" body={(r) => <Badge value={r.parameters_count || 0} />} />
+                    <Column header="Params" body={(r) => (
+                        isWidalCode(r.code)
+                            ? <Tag value="Widal Grid" severity="info" />
+                            : <Badge value={r.parameters_count || 0} />
+                    )} />
                     <Column header="Status" body={(r) => <StatusBadge status={r.status} />} />
                     <Column header="Actions" body={(r) => (
                         <TableActions

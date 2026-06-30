@@ -12,6 +12,8 @@ import PageLoader from '../../components/PageLoader';
 import StatusBadge from '../../components/StatusBadge';
 import { labTestService } from '../../services/api';
 import { useToast } from '../../context/ToastContext';
+import WidalLabTestFormat from '../../components/WidalLabTestFormat';
+import { isWidalCode } from '../../utils/widal';
 
 export default function LabTestView() {
     const { id } = useParams();
@@ -60,14 +62,20 @@ export default function LabTestView() {
                 </div>
             </Card>
             {item.report_type === 'grouped' && item.parameters?.length > 0 && (
-                <Card title="Parameters" style={{ marginTop: '1rem' }}>
-                    <DataTable value={item.parameters}>
-                        <Column field="name" header="Name" />
-                        <Column field="unit" header="Unit" />
-                        <Column field="reference_range" header="Reference" />
-                        <Column field="sort_order" header="Order" />
-                    </DataTable>
-                </Card>
+                isWidalCode(item.code) ? (
+                    <Card title="Widal Report Format" style={{ marginTop: '1rem' }}>
+                        <WidalLabTestFormat parameters={item.parameters} />
+                    </Card>
+                ) : (
+                    <Card title="Parameters" style={{ marginTop: '1rem' }}>
+                        <DataTable value={item.parameters}>
+                            <Column field="name" header="Name" />
+                            <Column field="unit" header="Unit" />
+                            <Column field="reference_range" header="Reference" />
+                            <Column field="sort_order" header="Order" />
+                        </DataTable>
+                    </Card>
+                )
             )}
         </AppLayout>
     );

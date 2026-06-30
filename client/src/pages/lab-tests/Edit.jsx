@@ -10,6 +10,8 @@ import AppLayout from '../../components/AppLayout';
 import PageHeader from '../../components/PageHeader';
 import { labTestService, testCategoryService } from '../../services/api';
 import { useToast } from '../../context/ToastContext';
+import WidalParameterEditor from '../../components/WidalParameterEditor';
+import { buildDefaultWidalParameters, isWidalCode } from '../../utils/widal';
 
 const emptyParam = () => ({ name: '', unit: '', reference_range: '', min_value: null, max_value: null, method: '', sort_order: 0, status: 'active' });
 
@@ -39,10 +41,17 @@ export default function LabTestEdit() {
                 reference_range: t.reference_range || '', min_value: t.min_value, max_value: t.max_value,
                 sort_order: t.sort_order || 0, status: t.status,
             });
-            setParameters(t.parameters || []);
-            setOriginalParams(JSON.parse(JSON.stringify(t.parameters || [])));
+            const params = t.parameters || [];
+            setParameters(isWidalCode(t.code) && !params.length ? buildDefaultWidalParameters() : params);
+            setOriginalParams(JSON.parse(JSON.stringify(params.length ? params : (isWidalCode(t.code) ? buildDefaultWidalParameters() : []))));
         }).catch(() => navigate('/lab-tests'));
     }, [id, navigate]);
+
+    useEffect(() => {
+        if (isWidalCode(form.code) && form.report_type === 'grouped' && parameters.length === 0) {
+            setParameters(buildDefaultWidalParameters());
+        }
+    }, [form.code, form.report_type, parameters.length]);
 
     async function syncParameters(testId) {
         const currentIds = parameters.filter((p) => p.id).map((p) => p.id);
@@ -109,6 +118,14 @@ export default function LabTestEdit() {
                         <div className="form-field"><label>Price</label><InputNumber value={form.price} onValueChange={(e) => setForm({ ...form, price: e.value })} mode="currency" currency="INR" locale="en-IN" /></div>
                     </div>
                     {form.report_type === 'grouped' && (
+                        isWidalCode(form.code) ? (
+                            <div style={{ marginTop: '1.5rem' }}>
+                                <WidalParameterEditor
+                                    parameters={parameters.length ? parameters : buildDefaultWidalParameters()}
+                                    onChange={setParameters}
+                                />
+                            </div>
+                        ) : (
                         <div style={{ marginTop: '1.5rem' }}>
                             <div className="param-section-header">
                                 <h3>Parameters</h3>
@@ -125,6 +142,7 @@ export default function LabTestEdit() {
                                 </div>
                             ))}
                         </div>
+                        )
                     )}
                     <div className="form-actions">
                         <Button type="submit" label="Save" loading={loading} />

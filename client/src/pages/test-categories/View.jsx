@@ -11,6 +11,8 @@ import PageLoader from '../../components/PageLoader';
 import StatusBadge from '../../components/StatusBadge';
 import { testCategoryService } from '../../services/api';
 import { useToast } from '../../context/ToastContext';
+import WidalLabTestFormat from '../../components/WidalLabTestFormat';
+import { isWidalCode } from '../../utils/widal';
 
 export default function TestCategoryView() {
     const { id } = useParams();
@@ -63,17 +65,28 @@ export default function TestCategoryView() {
             {groupedPanel && parameterRows.length > 0 && (
                 <Card style={{ marginTop: '1rem' }}>
                     <h3 style={{ marginTop: 0 }}>{groupedPanel.name}</h3>
-                    <p className="text-muted" style={{ marginBottom: '1rem' }}>
-                        {parameterRows.length} parameters in report sequence
-                    </p>
-                    <DataTable value={parameterRows} size="small">
-                        <Column header="#" body={(_, { rowIndex }) => rowIndex + 1} style={{ width: '3rem' }} />
-                        <Column field="name" header="Test Name" />
-                        <Column field="unit" header="Unit" />
-                        <Column field="reference_range" header="Reference Range" />
-                    </DataTable>
+                    {isWidalCode(groupedPanel.code) ? (
+                        <>
+                            <p className="text-muted" style={{ marginBottom: '1rem' }}>
+                                Widal dilution grid format — 4 antigens × 6 dilutions
+                            </p>
+                            <WidalLabTestFormat parameters={parameterRows} />
+                        </>
+                    ) : (
+                        <>
+                            <p className="text-muted" style={{ marginBottom: '1rem' }}>
+                                {parameterRows.length} parameters in report sequence
+                            </p>
+                            <DataTable value={parameterRows} size="small">
+                                <Column header="#" body={(_, { rowIndex }) => rowIndex + 1} style={{ width: '3rem' }} />
+                                <Column field="name" header="Test Name" />
+                                <Column field="unit" header="Unit" />
+                                <Column field="reference_range" header="Reference Range" />
+                            </DataTable>
+                        </>
+                    )}
                     <Button
-                        label="Edit CBC Panel"
+                        label={isWidalCode(groupedPanel.code) ? 'Edit Widal Test' : 'Edit Panel'}
                         icon="pi pi-pencil"
                         className="p-button-outlined"
                         style={{ marginTop: '1rem' }}

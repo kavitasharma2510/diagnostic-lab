@@ -16,5 +16,6 @@ router.get('/:id/preview', asyncHandler(reportController.preview));
 router.get('/:id', asyncHandler(reportController.get));
 router.put('/:id/results', validateBody(saveResultsSchema), asyncHandler(reportController.saveResults));
 router.post('/:id/approve', validateBody(approveReportSchema), asyncHandler(reportController.approve));
+router.delete('/:id', asyncHandler(reportController.remove));
 
 export default router;

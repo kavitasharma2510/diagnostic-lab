@@ -4,6 +4,13 @@ import { fileURLToPath, pathToFileURL } from 'url';
 import { launchPuppeteer } from '../utils/puppeteerLaunch.js';
 import { detectFlag } from '../utils/flagDetector.js';
 import { sortRowsByPanelSequence, resolvePanelKey } from '../constants/panelSequences.js';
+import {
+    WIDAL_DILUTIONS,
+    buildWidalAntigenRows,
+    buildWidalNote,
+    computeWidalOverall,
+    normalizeReaction,
+} from '../constants/widalFormat.js';
 import { getTyagiReportStyles } from './tyagiReportStyles.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -80,8 +87,9 @@ async function rasterizePdfLetterhead(pdfPath) {
     const { puppeteer } = await loadPdfDeps();
     const browser = await launchPuppeteer(puppeteer);
 
+    let page;
     try {
-        const page = await browser.newPage();
+        page = await browser.newPage();
         await page.setViewport({ width: 794, height: 1123, deviceScaleFactor: 2 });
         await page.goto(pathToFileURL(pdfPath).href, { waitUntil: 'load', timeout: 30000 });
         const png = await page.screenshot({
@@ -91,7 +99,7 @@ async function rasterizePdfLetterhead(pdfPath) {
         fs.writeFileSync(cachePath, png);
         return cachePath;
     } finally {
-        await page.close();
+        if (page) await page.close().catch(() => {});
     }
 }
 
@@ -199,10 +207,11 @@ function groupReportTestsForPdf(reportTests) {
         const reportType = labTest?.reportType || 'single';
 
         if (reportType === 'grouped' && rt.labTestId) {
-            let group = groups.find((g) => g.layout === 'grouped' && g.labTestId === rt.labTestId);
+            let group = groups.find((g) => (g.layout === 'grouped' || g.layout === 'widal') && g.labTestId === rt.labTestId);
             if (!group) {
+                const panelKey = resolvePanelKey(labTest?.code) || resolvePanelKey(labTest?.category?.code);
                 group = {
-                    layout: 'grouped',
+                    layout: panelKey === 'WIDAL' ? 'widal' : 'grouped',
                     labTestId: rt.labTestId,
                     heading: labTest?.name || rt.testName,
                     code: labTest?.code || '',
@@ -319,7 +328,59 @@ function renderTyagiPanelTitle(group) {
     return `${heading} Report`;
 }
 
+function renderWidalTestSection(group) {
+    const antigenRows = buildWidalAntigenRows(group.rows);
+    const overall = computeWidalOverall(antigenRows);
+    const note = buildWidalNote(antigenRows);
+    const overallCls = overall === 'POSITIVE' ? 'widal-overall positive' : 'widal-overall';
+
+    const gridRows = antigenRows.map((row) => `
+        <tr>
+            <td class="widal-antigen">${escapeHtml(row.testName)}</td>
+            ${WIDAL_DILUTIONS.map((d) => `
+                <td class="widal-cell">${escapeHtml(normalizeReaction(row.dilutions[d]) || '—')}</td>
+            `).join('')}
+        </tr>`).join('');
+
+    return `
+        <div class="panel-section widal-section">
+            <div class="widal-title">** REPORT ON THE WIDAL TEST</div>
+            <div class="report-table-wrap">
+                <table class="report widal-summary">
+                    <thead>
+                        <tr>
+                            <th>Investigation</th>
+                            <th>Result</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>WIDAL TEST</td>
+                            <td class="${overallCls}">${escapeHtml(overall)}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="report-table-wrap">
+                <table class="report widal-grid">
+                    <thead>
+                        <tr>
+                            <th class="widal-antigen-col">Investigation</th>
+                            ${WIDAL_DILUTIONS.map((d) => `<th>${escapeHtml(d)}</th>`).join('')}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${gridRows}
+                    </tbody>
+                </table>
+            </div>
+            ${note ? `<div class="widal-note">${escapeHtml(note)}</div>` : ''}
+            <div class="widal-end">******* END OF REPORT *******</div>
+        </div>`;
+}
+
 function renderTyagiTestSection(group) {
+    if (group.layout === 'widal') return renderWidalTestSection(group);
     const title = renderTyagiPanelTitle(group);
     return `
         <div class="panel-section">
@@ -351,6 +412,7 @@ function renderTyagiTestSection(group) {
 }
 
 function renderTestSection(group, reportNo) {
+    if (group.layout === 'widal') return renderWidalTestSection(group);
     const isGrouped = group.layout === 'grouped';
     const title = group.code
         ? `${group.heading.toUpperCase()} (${group.code})`
@@ -742,6 +804,40 @@ async function buildDrlogyReportHtml(report, samples = []) {
         }
         .interpretation-title, .advice-title { font-weight: 900; font-size: 9px; margin-bottom: 3px; color: #1565c0; }
 
+        /* ── Widal test layout ── */
+        .widal-section { margin: 10px 0 14px; }
+        .widal-title {
+            text-align: center;
+            font-size: 11px;
+            font-weight: 900;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+        }
+        .widal-summary { margin-bottom: 6px; width: 100%; border-collapse: collapse; }
+        .widal-grid { width: 100%; border-collapse: collapse; }
+        .widal-summary th, .widal-summary td,
+        .widal-grid th, .widal-grid td {
+            border: 1px solid #cfd8dc;
+            padding: 4px 6px;
+            font-size: 9px;
+        }
+        .widal-grid th, .widal-grid td { text-align: center; }
+        .widal-grid .widal-antigen, .widal-grid .widal-antigen-col { text-align: left; font-weight: 700; }
+        .widal-overall { font-weight: 900; text-transform: uppercase; }
+        .widal-overall.positive { color: #c62828; }
+        .widal-note {
+            margin-top: 6px;
+            font-size: 9px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+        .widal-end {
+            margin-top: 8px;
+            text-align: center;
+            font-size: 9px;
+            font-weight: 700;
+        }
+
         /* ── End of report + signatures ── */
         .end-marker {
             text-align: center; font-weight: 700; font-size: 9px;
@@ -874,8 +970,9 @@ export async function generateReportPdf(report, samples = []) {
     const { puppeteer } = await loadPdfDeps();
     const browser = await launchPuppeteer(puppeteer);
 
+    let page;
     try {
-        const page = await browser.newPage();
+        page = await browser.newPage();
         await page.setViewport({ width: 794, height: 1123, deviceScaleFactor: 1 });
         await page.setContent(html, { waitUntil: 'domcontentloaded', timeout: 30000 });
         await page.pdf({
@@ -886,7 +983,7 @@ export async function generateReportPdf(report, samples = []) {
             margin: { top: '0', bottom: '0', left: '0', right: '0' },
         });
     } finally {
-        await page.close();
+        if (page) await page.close().catch(() => {});
     }
 
     return `/reports/${fileName}`;

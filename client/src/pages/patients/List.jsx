@@ -48,7 +48,7 @@ export default function PatientList() {
 
     function confirmDelete(row) {
         confirmDialog({
-            message: `Delete patient "${row.name}"?`,
+            message: `Delete patient "${row.name}"? Their bills and reports will also be removed.`,
             header: 'Confirm',
             icon: 'pi pi-exclamation-triangle',
             acceptClassName: 'p-button-danger',

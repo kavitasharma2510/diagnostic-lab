@@ -3,6 +3,17 @@ import { AppError } from '../middleware/errorHandler.js';
 import { buildPagination, paginatedResponse, paginatedList } from '../utils/pagination.js';
 import { serialize } from '../utils/serialize.js';
 import { parseId } from '../utils/parseId.js';
+import fs from 'fs';
+import path from 'path';
+import { REPORTS_DIR } from '../templates/reportPdfTemplate.js';
+
+function deleteReportPdf(pdfPath) {
+    if (!pdfPath) return;
+    const filePath = path.join(REPORTS_DIR, path.basename(pdfPath));
+    if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+    }
+}
 
 function mapPatient(row) {
     return serialize({
@@ -108,18 +119,44 @@ export const patientService = {
 
     async remove(id) {
         const patientId = parseId(id);
-        const bills = await prisma.bill.count({ where: { patientId } });
+        const patient = await prisma.patient.findUnique({ where: { id: patientId } });
+        if (!patient) throw new AppError('Patient not found', 404);
 
-        if (bills > 0) {
-            throw new AppError('Cannot delete patient with existing bills.', 422, {
-                patient: ['Cannot delete patient with existing bills.'],
-            });
+        const reports = await prisma.labReport.findMany({
+            where: { patientId },
+            select: { id: true, pdfPath: true },
+        });
+
+        for (const report of reports) {
+            deleteReportPdf(report.pdfPath);
         }
 
-        try {
-            await prisma.patient.delete({ where: { id: patientId } });
-        } catch {
-            throw new AppError('Patient not found', 404);
+        await prisma.labReportTest.deleteMany({
+            where: { labReport: { patientId } },
+        });
+        await prisma.labReport.deleteMany({ where: { patientId } });
+
+        const samples = await prisma.sample.findMany({
+            where: { patientId },
+            select: { id: true },
+        });
+
+        for (const sample of samples) {
+            await prisma.sampleTest.deleteMany({ where: { sampleId: sample.id } });
+            await prisma.sampleStatusHistory.deleteMany({ where: { sampleId: sample.id } });
         }
+        await prisma.sample.deleteMany({ where: { patientId } });
+
+        const bills = await prisma.bill.findMany({
+            where: { patientId },
+            select: { id: true },
+        });
+
+        for (const bill of bills) {
+            await prisma.billTest.deleteMany({ where: { billId: bill.id } });
+        }
+        await prisma.bill.deleteMany({ where: { patientId } });
+
+        await prisma.patient.delete({ where: { id: patientId } });
     },
 };

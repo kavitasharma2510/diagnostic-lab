@@ -67,6 +67,7 @@ export const reportService = {
     saveResults: (id, data) => apiClient.put(`/reports/${id}/results`, data),
     approve: (id, data) => apiClient.post(`/reports/${id}/approve`, data),
     whatsappLink: (id) => apiClient.get(`/reports/${id}/whatsapp-link`),
+    delete: (id) => apiClient.delete(`/reports/${id}`),
     previewUrl: (id) => mediaUrl(`/api/reports/${id}/preview`),
     downloadUrl: (id) => mediaUrl(`/api/reports/${id}/download`),
 };

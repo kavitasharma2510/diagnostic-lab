@@ -363,5 +363,40 @@ export function getTyagiReportStyles() {
         }
         .page-content { position: relative; z-index: 1; }
         .panel-section { page-break-inside: avoid; }
+        .widal-section { margin: 10px 30px 14px; }
+        .widal-title {
+            text-align: center;
+            font-size: 13px;
+            font-weight: 800;
+            letter-spacing: 0.3px;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+        }
+        .widal-summary { margin-bottom: 8px; }
+        .widal-overall { font-weight: 800; text-transform: uppercase; }
+        .widal-overall.positive { color: #c0392b; }
+        .widal-grid th,
+        .widal-grid td {
+            text-align: center;
+            font-size: 10px;
+        }
+        .widal-grid .widal-antigen,
+        .widal-grid .widal-antigen-col {
+            text-align: left;
+            font-weight: 700;
+        }
+        .widal-note {
+            margin-top: 8px;
+            font-size: 10.5px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+        .widal-end {
+            margin-top: 10px;
+            text-align: center;
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+        }
     `;
 }
