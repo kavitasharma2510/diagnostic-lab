@@ -129,7 +129,7 @@ async function main() {
         await syncPanel(key);
         console.log('');
     }
-    console.log('Done. Categories: CBC, LFT, KFT, FBS, CRP with grouped tests.');
+    console.log('Done. Categories: CBC, LFT, KFT, FBS, CRP, WIDAL with grouped tests.');
 }
 
 main()

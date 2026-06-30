@@ -14,6 +14,9 @@ import reportsRouter from './routes/reports.routes.js';
 import registrationsRouter from './routes/registrations.routes.js';
 import { reportController } from './controllers/report.controller.js';
 import { errorHandler, asyncHandler } from './middleware/errorHandler.js';
+import { scheduleMonthlyDataCleanup } from './services/dataCleanup.service.js';
+import { warmupPdfAssets } from './templates/reportPdfTemplate.js';
+import { closePuppeteerBrowser } from './utils/puppeteerLaunch.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -68,4 +71,15 @@ app.use(errorHandler);
 
 app.listen(port, () => {
     console.log(`API running on http://localhost:${port}`);
+    scheduleMonthlyDataCleanup();
+    warmupPdfAssets().catch((err) => {
+        console.warn('[pdf-warmup] Skipped:', err.message || err);
+    });
 });
+
+for (const signal of ['SIGINT', 'SIGTERM']) {
+    process.on(signal, async () => {
+        await closePuppeteerBrowser().catch(() => {});
+        process.exit(0);
+    });
+}

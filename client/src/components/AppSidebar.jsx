@@ -10,18 +10,18 @@ const flow = [
 export default function AppSidebar() {
     return (
         <aside className="sidebar">
-            <div className="sidebar-header">
+            <div className="sidebar-header sidebar-header--brand">
                 <img
-                    src="/assets/tyagi-pathology-logo.png"
+                    src="/assets/tyagi-microscope-logo.png"
                     alt="Tyagi Pathology"
-                    className="sidebar-logo"
+                    className="sidebar-logo sidebar-logo--inline"
                 />
                 <div className="sidebar-brand-text">
                     <p className="sidebar-brand-name">
                         <span className="brand-tyagi">TYAGI</span>
                         <span className="brand-pathology"> PATHOLOGY</span>
                     </p>
-                    <p className="sidebar-tagline">Laboratory Information System</p>
+                    <p className="sidebar-tagline sidebar-tagline--lab">ACCURATE REPORTS, ADVANCED TECHNOLOGY</p>
                 </div>
             </div>
             <nav className="sidebar-nav">

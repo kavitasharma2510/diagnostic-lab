@@ -39,7 +39,8 @@ function labConfig() {
         website: process.env.LAB_WEBSITE || '',
         appUrl: process.env.APP_URL || 'http://localhost:5000',
         letterheadFile: process.env.LAB_LETTERHEAD_FILE || 'Tyagi_Pathology_Letterhead_A4_Final.pdf',
-        logoFile: process.env.LAB_LOGO_FILE || 'tyagi-pathology-logo.png',
+        logoFile: process.env.LAB_LOGO_FILE || 'tyagi-microscope-logo.png',
+        logoLayout: (process.env.LAB_LOGO_LAYOUT || 'inline').toLowerCase(),
         letterheadPadding: process.env.LAB_LETTERHEAD_PADDING || '108px 38px 118px 38px',
         reportTemplate: (process.env.LAB_REPORT_TEMPLATE || 'tyagi').toLowerCase(),
         useLetterhead: process.env.LAB_USE_LETTERHEAD === 'true',
@@ -82,7 +83,7 @@ async function rasterizePdfLetterhead(pdfPath) {
     try {
         const page = await browser.newPage();
         await page.setViewport({ width: 794, height: 1123, deviceScaleFactor: 2 });
-        await page.goto(pathToFileURL(pdfPath).href, { waitUntil: 'networkidle0', timeout: 60000 });
+        await page.goto(pathToFileURL(pdfPath).href, { waitUntil: 'load', timeout: 30000 });
         const png = await page.screenshot({
             type: 'png',
             clip: { x: 0, y: 0, width: 794, height: 1123 },
@@ -90,7 +91,7 @@ async function rasterizePdfLetterhead(pdfPath) {
         fs.writeFileSync(cachePath, png);
         return cachePath;
     } finally {
-        await browser.close();
+        await page.close();
     }
 }
 
@@ -423,6 +424,10 @@ function groupReportTests(reportTests) {
     return groupReportTestsForPdf(reportTests);
 }
 
+function isPortraitLogo(filename) {
+    return /microscope|stacked/i.test(filename || '');
+}
+
 async function buildTyagiReportHtml(report, samples = []) {
     const lab = labConfig();
     const whatsappIconDataUrl = await loadAssetDataUrl('whatsapp.png');
@@ -436,6 +441,16 @@ async function buildTyagiReportHtml(report, samples = []) {
     const reportedAt = report.approvedAt || report.preparedAt || report.createdAt;
     const groupHtml = groups.map((group) => renderTyagiTestSection(group)).join('');
     const reportRemarks = report.remarks || '';
+    const portraitLogo = isPortraitLogo(lab.logoFile);
+    const stackedLogo = portraitLogo && lab.logoLayout === 'stacked';
+    const logoClass = portraitLogo
+        ? (stackedLogo ? 'lab-logo--stacked' : 'lab-logo--portrait')
+        : '';
+    const brandBlock = `${logoDataUrl ? `<img class="lab-logo ${logoClass}" src="${logoDataUrl}" alt="${escapeHtml(lab.name)}" />` : ''}
+                    <div class="brand-name ${stackedLogo ? 'brand-name--centered' : ''}">
+                        <h1><span class="brand-tyagi">${escapeHtml(lab.namePart1)}</span> <span class="brand-pathology">${escapeHtml(lab.namePart2)}</span></h1>
+                        <div class="tagline">${escapeHtml(lab.tagline)}</div>
+                    </div>`;
 
     return `<!DOCTYPE html>
 <html lang="en">
@@ -451,13 +466,9 @@ async function buildTyagiReportHtml(report, samples = []) {
 
     <div class="page-content">
         <div class="header">
-            <div class="header-top">
-                <div class="header-brand">
-                    ${logoDataUrl ? `<img class="lab-logo" src="${logoDataUrl}" alt="${escapeHtml(lab.name)}" />` : ''}
-                    <div class="brand-name">
-                        <h1><span class="brand-tyagi">${escapeHtml(lab.namePart1)}</span> <span class="brand-pathology">${escapeHtml(lab.namePart2)}</span></h1>
-                        <div class="tagline">${escapeHtml(lab.tagline)}</div>
-                    </div>
+            <div class="header-top ${stackedLogo ? 'header-top--centered' : ''}">
+                <div class="header-brand ${stackedLogo ? 'header-brand--stacked' : portraitLogo ? 'header-brand--portrait' : ''}">
+                    ${brandBlock}
                 </div>
                 <div class="header-right">
                     <div class="contact-box">
@@ -513,18 +524,19 @@ async function buildTyagiReportHtml(report, samples = []) {
         </div>
     </div>
 
-    <div class="legal-disclaimer">THIS REPORT IS NOT VALID FOR MEDICO - LEGAL PURPOSE</div>
-
-    <div class="footer">
-        <div class="addr-block">
-            <div class="pin-icon">📍</div>
-            <div class="addr-text">
-                ADD. – ${formatAddressHtml(lab.address)}
+    <div class="page-footer">
+        <div class="legal-disclaimer">THIS REPORT IS NOT VALID FOR MEDICO - LEGAL PURPOSE</div>
+        <div class="footer">
+            <div class="addr-block">
+                <div class="pin-icon">📍</div>
+                <div class="addr-text">
+                    ADD. – ${formatAddressHtml(lab.address)}
+                </div>
             </div>
-        </div>
-        <div class="home-collect">
-            <span class="icon">🛵</span>
-            <span>FREE HOME COLLECTION</span>
+            <div class="home-collect">
+                <span class="icon">🛵</span>
+                <span>FREE HOME COLLECTION</span>
+            </div>
         </div>
     </div>
 </div>
@@ -865,7 +877,7 @@ export async function generateReportPdf(report, samples = []) {
     try {
         const page = await browser.newPage();
         await page.setViewport({ width: 794, height: 1123, deviceScaleFactor: 1 });
-        await page.setContent(html, { waitUntil: 'networkidle0' });
+        await page.setContent(html, { waitUntil: 'domcontentloaded', timeout: 30000 });
         await page.pdf({
             path: filePath,
             format: 'A4',
@@ -874,10 +886,21 @@ export async function generateReportPdf(report, samples = []) {
             margin: { top: '0', bottom: '0', left: '0', right: '0' },
         });
     } finally {
-        await browser.close();
+        await page.close();
     }
 
     return `/reports/${fileName}`;
+}
+
+export async function warmupPdfAssets() {
+    const lab = labConfig();
+    const { puppeteer } = await loadPdfDeps();
+    await launchPuppeteer(puppeteer);
+
+    await Promise.all([
+        loadAssetDataUrl(lab.logoFile),
+        lab.useLetterhead ? loadAssetDataUrl(lab.letterheadFile) : Promise.resolve(),
+    ]);
 }
 
 export { labConfig, REPORTS_DIR };

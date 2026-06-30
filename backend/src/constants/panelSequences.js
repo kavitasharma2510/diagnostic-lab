@@ -56,15 +56,22 @@ export const PANEL_PARAMETERS = {
     CRP: [
         { name: 'C-REACTIVE PROTEIN', unit: 'mg/dL', reference_range: '0.0 - 5', min_value: 0, max_value: 5, method: 'Immunoturbidimetry' },
     ],
+    WIDAL: [
+        { name: 'S. Typhi "O"', unit: '', reference_range: '(+) / (-)', method: 'Slide Agglutination' },
+        { name: 'S. Typhi "H"', unit: '', reference_range: '(+) / (-)', method: 'Slide Agglutination' },
+        { name: 'S. Para Typhi "A H"', unit: '', reference_range: '(+) / (-)', method: 'Slide Agglutination' },
+        { name: 'S. Para Typhi "B H"', unit: '', reference_range: '(+) / (-)', method: 'Slide Agglutination' },
+    ],
 };
 
 /** Default test category for each grouped panel */
 export const PANEL_TEST_CATEGORIES = {
-    CBC: { code: 'CBC', name: 'Hematology', description: 'Complete blood count and hematology panels' },
-    LFT: { code: 'LFT', name: 'Biochemistry', description: 'Liver function test panels' },
-    KFT: { code: 'KFT', name: 'Biochemistry', description: 'Kidney function test panels' },
-    FBS: { code: 'FBS', name: 'Biochemistry', description: 'Fasting blood sugar and glucose tests' },
-    CRP: { code: 'CRP', name: 'Serology', description: 'C-reactive protein and serology markers' },
+    CBC: { code: 'CBC', name: 'Complete Blood Count (CBC)', description: 'Complete blood count and hematology panels' },
+    LFT: { code: 'LFT', name: 'Liver Function Test (LFT)', description: 'Liver function test panels' },
+    KFT: { code: 'KFT', name: 'Kidney Function Test (KFT)', description: 'Kidney function test panels' },
+    FBS: { code: 'FBS', name: 'Fasting Blood Sugar (FBS)', description: 'Fasting blood sugar and glucose tests' },
+    CRP: { code: 'CRP', name: 'C-Reactive Protein (CRP)', description: 'C-reactive protein and inflammatory markers' },
+    WIDAL: { code: 'WIDAL', name: 'Widal Test', description: 'Typhoid fever Widal agglutination test' },
 };
 
 export const PANEL_CATEGORY_CODES = {
@@ -73,6 +80,7 @@ export const PANEL_CATEGORY_CODES = {
     KFT: 'KFT',
     FBS: 'FBS',
     CRP: 'CRP',
+    WIDAL: 'WIDAL',
 };
 
 /** Lab test code / category code → panel sequence key */
@@ -122,6 +130,14 @@ export const GROUPED_PANELS = {
         method: 'Immunoturbidimetry',
         price: 400,
     },
+    WIDAL: {
+        name: 'Widal Test',
+        code: 'WIDAL',
+        category_code: 'WIDAL',
+        sample_type: 'Serum',
+        method: 'Slide Agglutination',
+        price: 350,
+    },
 };
 
 const PANEL_NAME_ALIASES = {
@@ -152,6 +168,11 @@ const PANEL_NAME_ALIASES = {
     },
     CRP: {
         'c-reactive protein': 0, crp: 0, 'c reactive protein': 0,
+    },
+    WIDAL: {
+        's. typhi "o"': 0, 's typhi o': 0, 's. typhi "h"': 1, 's typhi h': 1,
+        's. para typhi "a h"': 2, 's para typhi a h': 2,
+        's. para typhi "b h"': 3, 's para typhi b h': 3,
     },
 };
 

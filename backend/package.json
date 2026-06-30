@@ -13,6 +13,7 @@
     "db:seed": "node prisma/seed.js",
     "db:sync-cbc": "node scripts/sync-cbc-parameters.mjs",
     "db:sync-panels": "node scripts/sync-all-panels.mjs",
+    "db:cleanup": "node scripts/run-data-cleanup.mjs",
     "db:studio": "prisma studio",
     "browsers:install": "node scripts/install-puppeteer-chrome.mjs",
     "postinstall": "prisma generate"

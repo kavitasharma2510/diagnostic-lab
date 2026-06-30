@@ -76,6 +76,13 @@ body {
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
+.sidebar-header--brand {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    text-align: left;
+}
+
 .sidebar-logo {
     display: block;
     max-width: 100%;
@@ -87,11 +94,37 @@ body {
     padding: 0.4rem;
 }
 
+.sidebar-logo--inline {
+    max-height: 76px;
+    max-width: 76px;
+    margin: 0;
+    flex-shrink: 0;
+    padding: 0.35rem;
+}
+
+.sidebar-logo--stacked {
+    max-height: 110px;
+    padding: 0.5rem;
+}
+
+.sidebar-brand-text {
+    min-width: 0;
+}
+
 .sidebar-brand-name {
     margin: 0;
     font-size: 0.82rem;
     font-weight: 700;
     letter-spacing: 0.07em;
+    line-height: 1.15;
+}
+
+.sidebar-brand-name .brand-tyagi {
+    color: #7eb8e8;
+}
+
+.sidebar-brand-name .brand-pathology {
+    color: #e8a0a8;
 }
 
 .sidebar-tagline {
@@ -100,6 +133,14 @@ body {
     color: rgba(255, 255, 255, 0.45);
     font-weight: 500;
     letter-spacing: 0.04em;
+}
+
+.sidebar-tagline--lab {
+    font-size: 0.5rem;
+    line-height: 1.35;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.5);
 }
 
 .brand-tyagi { color: #8ec5ff; }
@@ -377,21 +418,6 @@ body {
     border-bottom: 1px solid var(--border);
     margin-bottom: 1rem !important;
     padding-bottom: 0.6rem;
-}
-
-.bulk-edit-panel {
-    padding: 1rem;
-    margin-bottom: 1rem;
-    background: var(--surface-muted);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-sm);
-}
-
-.bulk-edit-panel h4 {
-    margin: 0 0 0.75rem;
-    font-size: 0.85rem;
-    font-weight: 700;
-    color: var(--brand-blue);
 }
 
 .param-panel {

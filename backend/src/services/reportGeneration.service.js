@@ -12,6 +12,25 @@ import { sortRowsByPanelSequence, resolvePanelKey } from '../constants/panelSequ
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+function isCachedPdfStale(pdfPath) {
+    if (!fs.existsSync(pdfPath)) return true;
+
+    const pdfMtime = fs.statSync(pdfPath).mtimeMs;
+    const templateFiles = [
+        path.join(__dirname, '../templates/reportPdfTemplate.js'),
+        path.join(__dirname, '../templates/tyagiReportStyles.js'),
+    ];
+    const templateMtime = Math.max(
+        ...templateFiles.map((file) => (fs.existsSync(file) ? fs.statSync(file).mtimeMs : 0)),
+    );
+
+    const lab = labConfig();
+    const logoPath = path.join(__dirname, '../public/assets', lab.logoFile);
+    const logoMtime = fs.existsSync(logoPath) ? fs.statSync(logoPath).mtimeMs : 0;
+
+    return logoMtime > pdfMtime || templateMtime > pdfMtime;
+}
+
 function mapReport(report) {
     return serialize({
         ...report,
@@ -439,22 +458,35 @@ export const reportGenerationService = {
         return generateReportPdf(report, samples);
     },
 
-    async ensurePdfFile(report) {
+    async resolvePdfFile(report) {
         if (!['approved', 'generated'].includes(report.status)) {
             throw new AppError('PDF not generated yet. Approve the report first.', 404);
         }
 
+        const existingRelative = report.pdfPath || report.pdf_path;
+        if (existingRelative) {
+            const existingPath = path.join(REPORTS_DIR, path.basename(existingRelative));
+            if (fs.existsSync(existingPath) && !isCachedPdfStale(existingPath)) {
+                return { filePath: existingPath, relative: existingRelative };
+            }
+        }
+
         try {
-            const pdfPath = await this.createPdfForReport(report);
+            const relative = await this.createPdfForReport(report);
+            const filePath = path.join(REPORTS_DIR, path.basename(relative));
+
+            if (!fs.existsSync(filePath)) {
+                throw new Error('PDF was generated but file is missing on disk.');
+            }
 
             await prisma.labReport.update({
                 where: { id: report.id },
-                data: { pdfPath },
+                data: { pdfPath: relative },
             });
 
-            const filePath = path.join(REPORTS_DIR, path.basename(pdfPath));
-            return { filePath, relative: pdfPath };
+            return { filePath, relative };
         } catch (err) {
+            if (err instanceof AppError) throw err;
             throw new AppError(
                 err.message?.includes('Chrome not found')
                     ? 'PDF generation failed: Chrome not installed on server. Run: npm run browsers:install -w backend'
@@ -464,33 +496,19 @@ export const reportGenerationService = {
         }
     },
 
-    getPdfFilePath(report) {
-        if (!report.pdfPath && !report.pdf_path) {
-            throw new AppError('PDF not generated yet. Approve the report first.', 404);
-        }
-
-        const relative = report.pdfPath || report.pdf_path;
-        const filePath = path.join(REPORTS_DIR, path.basename(relative));
-
-        if (!fs.existsSync(filePath)) {
-            throw new AppError('PDF file not found on server.', 404);
-        }
-
-        return { filePath, relative };
-    },
-
     async getDownload(id) {
         const report = await prisma.labReport.findUnique({
             where: { id: parseId(id) },
             include: reportInclude,
         });
         if (!report) throw new AppError('Report not found', 404);
-        return this.ensurePdfFile(report);
+        return this.resolvePdfFile(report);
     },
 
     getPublicPdfUrl(report) {
-        const relative = report.pdfPath || report.pdf_path;
-        if (!relative) return null;
-        return `${labConfig().appUrl}${relative}`;
+        const base = labConfig().appUrl.replace(/\/$/, '');
+        const reportId = report.id;
+        if (!reportId) return null;
+        return `${base}/api/reports/${reportId}/download`;
     },
 };

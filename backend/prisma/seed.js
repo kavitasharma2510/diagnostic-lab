@@ -97,7 +97,7 @@ async function main() {
         await upsertCategory({ name: cat.name, code: cat.code, description: cat.description });
     }
 
-    for (const panelKey of ['CBC', 'LFT', 'KFT', 'FBS', 'CRP']) {
+    for (const panelKey of ['CBC', 'LFT', 'KFT', 'FBS', 'CRP', 'WIDAL']) {
         const cat = await prisma.testCategory.findUnique({ where: { code: panelKey } });
         if (cat) await seedGroupedTest(cat.id, panelKey);
     }

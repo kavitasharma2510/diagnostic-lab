@@ -80,7 +80,22 @@ npm run db:seed
 
 Or use **Render Shell** on the service and run the same commands.
 
-> **PDF generation** needs Chrome. The build runs `npm run browsers:install`. Use at least **Starter** plan (512MB+ RAM). Free tier may fail on PDF approve.
+> **PDF generation** needs Chrome. The build runs `npm run browsers:install`. Use at least **Starter** plan (512MB+ RAM). Free tier may fail on PDF approve. The API reuses a single Chrome instance and pre-warms letterhead assets on startup to speed up approval.
+
+### Optional — automatic data cleanup
+
+On the **1st of each month at 2:00 AM** (server time), records older than the retention period are removed from MongoDB and PDF files on disk are deleted.
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `DATA_RETENTION_MONTHS` | `1` | Delete patients, bills, and reports older than this many months |
+| `ENABLE_DATA_CLEANUP` | `true` | Set to `false` to disable scheduled cleanup |
+
+Manual run from your PC or Render Shell:
+
+```bash
+npm run db:cleanup -w backend
+```
 
 ---
 
@@ -151,6 +166,7 @@ Redeploy the API so CORS allows your Vercel domain.
 | CORS error in browser | Set `CLIENT_URL` on Render to exact Vercel URL, redeploy API |
 | `MONGO_URI is missing` | Add Atlas URI in Render env vars |
 | PDF fails / Chrome not found | Upgrade Render plan; rebuild so `browsers:install` runs |
+| `PDF file not found on server` | Redeploy API (latest code regenerates PDFs on preview). Click **Retry** on preview |
 | Blank page on Vercel | Check `VITE_API_URL` is set at **build** time; redeploy after changing it |
 | Render cold start (slow first load) | Normal on free/starter — first request wakes the service |
 | Old data / empty lists | Run `npm run db:seed` against production Atlas (once) |

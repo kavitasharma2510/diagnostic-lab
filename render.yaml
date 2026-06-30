@@ -44,7 +44,9 @@ services:
       - key: LAB_LETTERHEAD_FILE
         value: Tyagi_Pathology_Letterhead_A4_Final.pdf
       - key: LAB_LOGO_FILE
-        value: tyagi-pathology-logo.png
+        value: tyagi-microscope-logo.png
+      - key: LAB_LOGO_LAYOUT
+        value: inline
       - key: LAB_REPORT_TEMPLATE
         value: tyagi
       - key: LAB_USE_LETTERHEAD
