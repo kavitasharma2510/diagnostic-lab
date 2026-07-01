@@ -6,31 +6,48 @@ export function getTyagiReportStyles() {
         html, body {
             font-family: Arial, Helvetica, sans-serif;
             background: #fff;
-            width: 210mm;
-            margin: 0 auto;
+            width: 100%;
+            margin: 0;
+            padding: 0;
             -webkit-print-color-adjust: exact;
             print-color-adjust: exact;
         }
+        .print-layout {
+            width: 100%;
+            margin: 0;
+            border-collapse: collapse;
+            table-layout: fixed;
+        }
+        .print-layout thead { display: table-header-group; }
+        .print-layout tbody { display: table-row-group; }
+        .print-layout td {
+            padding: 0;
+            vertical-align: top;
+        }
         .page {
-            width: 210mm;
+            width: 100%;
             min-height: 297mm;
             background: #fff;
-            margin: 0 auto;
+            margin: 0;
             position: relative;
-            padding-bottom: 120px;
+        }
+        .page-header {
+            width: 100%;
+            background: #fff;
         }
         .header {
             display: flex;
             flex-direction: column;
             gap: 8px;
-            padding: 12px 30px 10px;
+            padding: 12px 30px 10px 10px;
             border-bottom: 3px solid #1a2a5e;
             position: relative;
+            background: #fff;
         }
         .header::after {
             content: '';
             position: absolute;
-            bottom: -5px; left: 30px; right: 30px;
+            bottom: -5px; left: 10px; right: 30px;
             height: 2px;
             background: linear-gradient(to right, #c0392b 35%, transparent);
         }
@@ -61,6 +78,7 @@ export function getTyagiReportStyles() {
             gap: 12px;
             flex: 1;
             min-width: 0;
+            margin-left: -2px;
         }
         .header-brand--stacked {
             flex: 0 1 auto;
@@ -220,6 +238,7 @@ export function getTyagiReportStyles() {
             border-collapse: collapse;
             font-size: 11.5px;
         }
+        table.report thead { display: table-header-group; }
         table.report thead tr { background: #1a2a5e; color: #fff; }
         table.report thead th {
             padding: 6px 10px;
@@ -263,6 +282,8 @@ export function getTyagiReportStyles() {
             background: #fafafa;
             font-size: 10.5px;
             line-height: 1.45;
+            page-break-inside: avoid;
+            break-inside: avoid;
         }
         .advice-box .advice-title {
             font-weight: 800;
@@ -274,6 +295,10 @@ export function getTyagiReportStyles() {
             justify-content: flex-end;
             padding: 18px 36px 6px;
             font-size: 10.5px;
+            page-break-before: avoid;
+            break-before: avoid;
+            page-break-inside: avoid;
+            break-inside: avoid;
         }
         .sig-block { text-align: center; }
         .sig-block .sig-role {
@@ -288,10 +313,16 @@ export function getTyagiReportStyles() {
             margin: 0 auto;
         }
         .page-footer {
-            position: absolute;
+            position: fixed;
             bottom: 0;
             left: 0;
             right: 0;
+            width: 100%;
+            margin: 0;
+            padding: 0;
+            z-index: 10;
+            background: #fff;
+            box-sizing: border-box;
         }
         .legal-disclaimer {
             text-align: center;
@@ -299,14 +330,17 @@ export function getTyagiReportStyles() {
             font-weight: 800;
             letter-spacing: 0.7px;
             color: #333;
-            padding: 10px 30px 12px;
+            padding: 10px 0 12px;
             text-transform: uppercase;
             background: #fff;
         }
         .footer {
             background: #1a2a5e;
             color: #fff;
-            padding: 14px 30px;
+            padding: 14px 10px;
+            width: 100%;
+            margin: 0;
+            box-sizing: border-box;
             display: flex;
             align-items: center;
             justify-content: space-between;
@@ -361,9 +395,24 @@ export function getTyagiReportStyles() {
             white-space: nowrap;
             z-index: 0;
         }
-        .page-content { position: relative; z-index: 1; }
-        .panel-section { page-break-inside: avoid; }
+        .page-content {
+            position: relative;
+            z-index: 1;
+            padding-bottom: 32mm;
+        }
+        .panel-section {
+            page-break-inside: avoid;
+            break-inside: avoid;
+        }
+        .report-closing {
+            page-break-inside: avoid;
+            break-inside: avoid;
+        }
         .widal-section { margin: 10px 30px 14px; }
+        .widal-section .report-table-wrap {
+            page-break-inside: avoid;
+            break-inside: avoid;
+        }
         .widal-title {
             text-align: center;
             font-size: 13px;
@@ -397,6 +446,41 @@ export function getTyagiReportStyles() {
             font-size: 10px;
             font-weight: 700;
             letter-spacing: 0.5px;
+            page-break-before: avoid;
+            break-before: avoid;
+        }
+        @media print {
+            @page {
+                size: A4 portrait;
+                margin: 0;
+            }
+            html, body {
+                width: 100% !important;
+                max-width: none !important;
+                margin: 0 !important;
+                padding: 0 !important;
+            }
+            .print-layout, .page, .page-header {
+                width: 100% !important;
+                max-width: none !important;
+                margin: 0 !important;
+            }
+            .page-footer {
+                width: 100% !important;
+                max-width: none !important;
+                margin: 0 !important;
+                left: 0 !important;
+                right: 0 !important;
+            }
+            .footer {
+                width: 100% !important;
+                max-width: none !important;
+                margin: 0 !important;
+                padding-top: 14px !important;
+                padding-bottom: 14px !important;
+                padding-left: 10px !important;
+                padding-right: 10px !important;
+            }
         }
     `;
 }

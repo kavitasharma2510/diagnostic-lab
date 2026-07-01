@@ -46,6 +46,18 @@ export const reportController = {
         res.sendFile(filePath);
     },
 
+    async printView(req, res) {
+        const html = await reportGenerationService.getPrintHtml(req.params.id);
+        res.setHeader('Content-Type', 'text/html; charset=utf-8');
+        res.setHeader('Content-Disposition', 'inline');
+        res.send(html);
+    },
+
+    async publicDownload(req, res) {
+        const { filePath, relative } = await reportGenerationService.getDownloadByReportNo(req.params.reportNo);
+        res.download(filePath, path.basename(relative));
+    },
+
     async verify(req, res) {
         const data = await reportGenerationService.getByReportNo(req.params.reportNo);
         if (req.accepts('html')) {
@@ -55,7 +67,8 @@ export const reportController = {
     },
 
     async whatsappLink(req, res) {
-        const data = await whatsappShareService.getShareLink(req.params.id);
+        const mobiles = req.query.mobiles || req.body?.mobiles;
+        const data = await whatsappShareService.getShareLink(req.params.id, mobiles);
         res.json({ data });
     },
 

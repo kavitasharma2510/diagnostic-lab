@@ -13,6 +13,7 @@ router.post('/generate/:billId', asyncHandler(reportController.generate));
 router.get('/:id/whatsapp-link', asyncHandler(reportController.whatsappLink));
 router.get('/:id/download', asyncHandler(reportController.download));
 router.get('/:id/preview', asyncHandler(reportController.preview));
+router.get('/:id/print', asyncHandler(reportController.printView));
 router.get('/:id', asyncHandler(reportController.get));
 router.put('/:id/results', validateBody(saveResultsSchema), asyncHandler(reportController.saveResults));
 router.post('/:id/approve', validateBody(approveReportSchema), asyncHandler(reportController.approve));

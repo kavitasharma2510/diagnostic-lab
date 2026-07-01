@@ -12,6 +12,7 @@ import PageHeader from '../../components/PageHeader';
 import TableActions from '../../components/TableActions';
 import { reportService } from '../../services/api';
 import { useToast } from '../../context/ToastContext';
+import WhatsAppShareDialog from '../../components/WhatsAppShareDialog';
 
 const statusOptions = [
     { label: 'All Statuses', value: null },
@@ -29,6 +30,7 @@ export default function ReportList() {
     const [loading, setLoading] = useState(false);
     const [total, setTotal] = useState(0);
     const [filters, setFilters] = useState({ search: '', status: null, page: 1, per_page: 10 });
+    const [whatsappShare, setWhatsappShare] = useState(null);
 
     async function load() {
         setLoading(true);
@@ -50,13 +52,12 @@ export default function ReportList() {
 
     useEffect(() => { load(); }, [filters.page, filters.per_page, filters.status]);
 
-    async function shareWhatsApp(id) {
-        try {
-            const { data } = await reportService.whatsappLink(id);
-            window.open(data.data.whatsapp_url, '_blank');
-        } catch (e) {
-            toast.error(e.response?.data?.message || 'WhatsApp link failed');
-        }
+    function shareWhatsApp(row) {
+        setWhatsappShare({
+            id: row.id,
+            mobile: row.patient?.mobile || '',
+            name: row.patient?.name || '',
+        });
     }
 
     function confirmDelete(row) {
@@ -115,13 +116,20 @@ export default function ReportList() {
                                 ...(r.status === 'approved' ? [
                                     { title: 'Preview', icon: 'pi pi-eye', onClick: () => navigate(`/reports/${r.id}/preview`) },
                                     { title: 'Download', icon: 'pi pi-download', onClick: () => window.open(reportService.downloadUrl(r.id), '_blank') },
-                                    { title: 'WhatsApp', icon: 'pi pi-whatsapp', onClick: () => shareWhatsApp(r.id) },
+                                    { title: 'WhatsApp', icon: 'pi pi-whatsapp', onClick: () => shareWhatsApp(r) },
                                 ] : []),
                                 { title: 'Delete', icon: 'pi pi-trash', onClick: () => confirmDelete(r) },
                             ]}
                         />
                     )} />
                 </DataTable>
+            <WhatsAppShareDialog
+                visible={Boolean(whatsappShare)}
+                onHide={() => setWhatsappShare(null)}
+                reportId={whatsappShare?.id}
+                defaultMobile={whatsappShare?.mobile}
+                patientName={whatsappShare?.name}
+            />
         </AppLayout>
     );
 }

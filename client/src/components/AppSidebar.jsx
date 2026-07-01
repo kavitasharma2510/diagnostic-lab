@@ -7,7 +7,7 @@ const flow = [
     { step: '04', label: 'Reports', icon: 'pi pi-file-pdf', to: '/reports' },
 ];
 
-export default function AppSidebar() {
+export default function AppSidebar({ onNavigate }) {
     return (
         <aside className="sidebar">
             <div className="sidebar-header sidebar-header--brand">
@@ -30,6 +30,7 @@ export default function AppSidebar() {
                     <NavLink
                         key={item.to}
                         to={item.to}
+                        onClick={onNavigate}
                         className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
                     >
                         <span className="nav-step">{item.step}</span>

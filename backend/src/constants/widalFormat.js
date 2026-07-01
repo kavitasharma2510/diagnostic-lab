@@ -49,10 +49,15 @@ export function serializeWidalResult(dilutionMap) {
 
 export function isWidalResultComplete(resultValue) {
     const map = parseWidalResult(resultValue);
-    return WIDAL_DILUTIONS.every((d) => {
+    return WIDAL_DILUTIONS.some((d) => {
         const v = normalizeReaction(map[d]);
         return v === '(+)' || v === '(-)';
     });
+}
+
+/** True when no (+) or (-) has been entered in any dilution cell. */
+export function isWidalResultEmpty(resultValue) {
+    return !isWidalResultComplete(resultValue);
 }
 
 export function buildWidalAntigenRows(reportRows) {

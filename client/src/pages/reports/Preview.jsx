@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Card } from 'primereact/card';
 import { Button } from 'primereact/button';
@@ -8,6 +8,7 @@ import PageHeader from '../../components/PageHeader';
 import PageLoader from '../../components/PageLoader';
 import { reportService } from '../../services/api';
 import { useToast } from '../../context/ToastContext';
+import WhatsAppShareDialog from '../../components/WhatsAppShareDialog';
 
 export default function ReportPreview() {
     const { id } = useParams();
@@ -18,6 +19,10 @@ export default function ReportPreview() {
     const [pdfLoading, setPdfLoading] = useState(false);
     const [pdfError, setPdfError] = useState(null);
     const [pdfRetryKey, setPdfRetryKey] = useState(0);
+    const [whatsappVisible, setWhatsappVisible] = useState(false);
+    const [printLoading, setPrintLoading] = useState(false);
+    const iframeRef = useRef(null);
+    const printFrameRef = useRef(null);
 
     useEffect(() => {
         reportService.get(id).then(({ data }) => setReport(data.data)).catch(() => navigate('/reports'));
@@ -49,13 +54,50 @@ export default function ReportPreview() {
     }, [id, report, pdfRetryKey]);
 
     async function shareWhatsApp() {
+        setWhatsappVisible(true);
+    }
+
+    async function printReport() {
+        if (report?.status !== 'approved') return;
+
+        setPrintLoading(true);
         try {
-            const { data } = await reportService.whatsappLink(id);
-            window.open(data.data.whatsapp_url, '_blank');
+            const res = await fetch(reportService.printUrl(id));
+            if (!res.ok) {
+                const body = await res.json().catch(() => ({}));
+                throw new Error(body.message || 'Failed to load report for printing');
+            }
+
+            const html = await res.text();
+
+            let frame = printFrameRef.current;
+            if (!frame) {
+                frame = document.createElement('iframe');
+                frame.setAttribute('title', 'Print report');
+                frame.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden';
+                document.body.appendChild(frame);
+                printFrameRef.current = frame;
+            }
+
+            const doc = frame.contentDocument || frame.contentWindow?.document;
+            if (!doc) {
+                throw new Error('Print failed — could not open print frame');
+            }
+
+            doc.open();
+            doc.write(html);
+            doc.close();
         } catch (e) {
-            toast.error(e.response?.data?.message || 'WhatsApp link failed');
+            toast.error(e.message || 'Print failed');
+        } finally {
+            setPrintLoading(false);
         }
     }
+
+    useEffect(() => () => {
+        printFrameRef.current?.remove();
+        printFrameRef.current = null;
+    }, []);
 
     if (!report) return <AppLayout><PageLoader message="Loading report..." /></AppLayout>;
 
@@ -64,6 +106,7 @@ export default function ReportPreview() {
             <PageHeader title="Report Preview" subtitle={report.report_no}>
                 <Button label="Download PDF" icon="pi pi-download" onClick={() => window.open(reportService.downloadUrl(id), '_blank')} />
                 <Button label="WhatsApp Share" icon="pi pi-whatsapp" severity="success" onClick={shareWhatsApp} />
+                <Button label="Print" icon="pi pi-print" onClick={printReport} loading={printLoading} disabled={report.status !== 'approved' || printLoading} />
                 <Button label="Edit Results" icon="pi pi-pencil" outlined onClick={() => navigate(`/reports/entry/${id}`)} />
                 <Button label="Back" severity="secondary" outlined onClick={() => navigate('/reports')} />
             </PageHeader>
@@ -80,12 +123,19 @@ export default function ReportPreview() {
                             <Button label="Retry" icon="pi pi-refresh" onClick={() => setPdfRetryKey((k) => k + 1)} />
                         </div>
                     ) : pdfUrl ? (
-                        <iframe title="Report PDF" src={pdfUrl} className="pdf-preview-frame" />
+                        <iframe ref={iframeRef} title="Report PDF" src={pdfUrl} className="pdf-preview-frame" />
                     ) : null
                 ) : (
                     <p className="text-muted">Approve the report to generate and preview the PDF.</p>
                 )}
             </Card>
+            <WhatsAppShareDialog
+                visible={whatsappVisible}
+                onHide={() => setWhatsappVisible(false)}
+                reportId={id}
+                defaultMobile={report.patient?.mobile}
+                patientName={report.patient?.name}
+            />
         </AppLayout>
     );
 }

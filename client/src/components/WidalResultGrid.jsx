@@ -17,7 +17,7 @@ function ReactionToggle({ value, onSelect, disabled }) {
             <button
                 type="button"
                 className={`widal-reaction-btn ${isPlus ? 'active-plus' : ''}`}
-                onClick={() => onSelect('(+)')}
+                onClick={() => onSelect(isPlus ? '' : '(+)')}
                 disabled={disabled}
                 title="Positive"
             >
@@ -26,7 +26,7 @@ function ReactionToggle({ value, onSelect, disabled }) {
             <button
                 type="button"
                 className={`widal-reaction-btn ${isMinus ? 'active-minus' : ''}`}
-                onClick={() => onSelect('(-)')}
+                onClick={() => onSelect(isMinus ? '' : '(-)')}
                 disabled={disabled}
                 title="Negative"
             >
@@ -99,7 +99,7 @@ export default function WidalResultGrid({ rows, onChange, disabled = false }) {
             </div>
 
             {note && <div className="widal-lab-note">{note}</div>}
-            <p className="widal-entry-hint">Click <strong>(+)</strong> or <strong>(-)</strong> in each cell for every dilution.</p>
+            <p className="widal-entry-hint">Click <strong>(+)</strong> or <strong>(-)</strong> for each dilution as needed. Cells can be left blank; click again to clear.</p>
         </div>
     );
 }

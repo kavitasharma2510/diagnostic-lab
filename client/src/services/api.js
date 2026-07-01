@@ -66,8 +66,11 @@ export const reportService = {
     get: (id) => apiClient.get(`/reports/${id}`),
     saveResults: (id, data) => apiClient.put(`/reports/${id}/results`, data),
     approve: (id, data) => apiClient.post(`/reports/${id}/approve`, data),
-    whatsappLink: (id) => apiClient.get(`/reports/${id}/whatsapp-link`),
+    whatsappLink: (id, mobiles) => apiClient.get(`/reports/${id}/whatsapp-link`, {
+        params: mobiles ? { mobiles: Array.isArray(mobiles) ? mobiles.join(',') : mobiles } : undefined,
+    }),
     delete: (id) => apiClient.delete(`/reports/${id}`),
     previewUrl: (id) => mediaUrl(`/api/reports/${id}/preview`),
+    printUrl: (id) => mediaUrl(`/api/reports/${id}/print`),
     downloadUrl: (id) => mediaUrl(`/api/reports/${id}/download`),
 };

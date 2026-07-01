@@ -154,7 +154,7 @@ export default function SampleView() {
                 />
             </Card>
 
-            <Dialog header="Reject Sample" visible={rejectVisible} onHide={() => setRejectVisible(false)} style={{ width: '420px' }}>
+            <Dialog header="Reject Sample" visible={rejectVisible} onHide={() => setRejectVisible(false)} className="dialog-fluid-wide" modal>
                 <div className="form-field">
                     <label>Rejection Reason <span className="required">*</span></label>
                     <InputTextarea value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} rows={4} autoResize className="w-full" />

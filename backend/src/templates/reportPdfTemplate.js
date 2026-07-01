@@ -16,17 +16,22 @@ import { getTyagiReportStyles } from './tyagiReportStyles.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPORTS_DIR = path.join(__dirname, '../../public/reports');
 
+let pdfDepsPromise = null;
+const assetDataUrlCache = new Map();
+
 async function loadPdfDeps() {
-    const [bwipjs, QRCode, puppeteer] = await Promise.all([
-        import('bwip-js'),
-        import('qrcode'),
-        import('puppeteer'),
-    ]);
-    return {
-        bwipjs: bwipjs.default || bwipjs,
-        QRCode: QRCode.default || QRCode,
-        puppeteer: puppeteer.default || puppeteer,
-    };
+    if (!pdfDepsPromise) {
+        pdfDepsPromise = Promise.all([
+            import('bwip-js'),
+            import('qrcode'),
+            import('puppeteer'),
+        ]).then(([bwipjs, QRCode, puppeteer]) => ({
+            bwipjs: bwipjs.default || bwipjs,
+            QRCode: QRCode.default || QRCode,
+            puppeteer: puppeteer.default || puppeteer,
+        }));
+    }
+    return pdfDepsPromise;
 }
 
 function labConfig() {
@@ -108,16 +113,26 @@ async function loadAssetDataUrl(filename) {
     if (!fs.existsSync(assetPath)) return '';
 
     const ext = path.extname(filename).toLowerCase();
+    const sourceMtime = fs.statSync(assetPath).mtimeMs;
     let imagePath = assetPath;
+    let cacheMtime = sourceMtime;
 
     if (ext === '.pdf') {
         imagePath = await rasterizePdfLetterhead(assetPath);
+        cacheMtime = fs.statSync(imagePath).mtimeMs;
+    }
+
+    const cacheKey = `${imagePath}:${cacheMtime}`;
+    if (assetDataUrlCache.has(cacheKey)) {
+        return assetDataUrlCache.get(cacheKey);
     }
 
     const mime = ext === '.jpg' || ext === '.jpeg'
         ? 'image/jpeg'
         : 'image/png';
-    return `data:${mime};base64,${fs.readFileSync(imagePath).toString('base64')}`;
+    const dataUrl = `data:${mime};base64,${fs.readFileSync(imagePath).toString('base64')}`;
+    assetDataUrlCache.set(cacheKey, dataUrl);
+    return dataUrl;
 }
 
 async function loadLetterheadDataUrl(filename) {
@@ -492,8 +507,10 @@ function isPortraitLogo(filename) {
 
 async function buildTyagiReportHtml(report, samples = []) {
     const lab = labConfig();
-    const whatsappIconDataUrl = await loadAssetDataUrl('whatsapp.png');
-    const logoDataUrl = await loadAssetDataUrl(lab.logoFile);
+    const [whatsappIconDataUrl, logoDataUrl] = await Promise.all([
+        loadAssetDataUrl('whatsapp.png'),
+        loadAssetDataUrl(lab.logoFile),
+    ]);
 
     const patient = report.patient;
     const ageText = patient?.age != null ? String(patient.age) : '';
@@ -501,7 +518,11 @@ async function buildTyagiReportHtml(report, samples = []) {
     const ageSexText = [ageText, sexText].filter(Boolean).join(' / ');
     const groups = groupReportTests(report.reportTests || []);
     const reportedAt = report.approvedAt || report.preparedAt || report.createdAt;
-    const groupHtml = groups.map((group) => renderTyagiTestSection(group)).join('');
+    const lastGroup = groups.length ? groups[groups.length - 1] : null;
+    const leadingGroupHtml = groups.length > 1
+        ? groups.slice(0, -1).map((group) => renderTyagiTestSection(group)).join('')
+        : '';
+    const closingGroupHtml = lastGroup ? renderTyagiTestSection(lastGroup) : '';
     const reportRemarks = report.remarks || '';
     const portraitLogo = isPortraitLogo(lab.logoFile);
     const stackedLogo = portraitLogo && lab.logoLayout === 'stacked';
@@ -523,31 +544,39 @@ async function buildTyagiReportHtml(report, samples = []) {
     <style>${getTyagiReportStyles()}</style>
 </head>
 <body>
+<table class="print-layout">
+<thead>
+<tr><td>
+<div class="page-header">
+    <div class="header">
+        <div class="header-top ${stackedLogo ? 'header-top--centered' : ''}">
+            <div class="header-brand ${stackedLogo ? 'header-brand--stacked' : portraitLogo ? 'header-brand--portrait' : ''}">
+                ${brandBlock}
+            </div>
+            <div class="header-right">
+                <div class="contact-box">
+                    <div class="owner-name">${escapeHtml(lab.ownerName)}</div>
+                    <div class="phone">
+                        ${whatsappIconDataUrl ? `<img class="whatsapp-icon" src="${whatsappIconDataUrl}" alt="" />` : ''}
+                        ${escapeHtml(lab.phone)}
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="email-row">
+            <span class="email-icon"></span>
+            <span>Email</span> &nbsp;–&nbsp; <span class="email-value">${escapeHtml(lab.email)}</span>
+        </div>
+    </div>
+</div>
+</td></tr>
+</thead>
+<tbody>
+<tr><td>
 <div class="page">
     <div class="watermark">${escapeHtml(lab.name)}</div>
 
     <div class="page-content">
-        <div class="header">
-            <div class="header-top ${stackedLogo ? 'header-top--centered' : ''}">
-                <div class="header-brand ${stackedLogo ? 'header-brand--stacked' : portraitLogo ? 'header-brand--portrait' : ''}">
-                    ${brandBlock}
-                </div>
-                <div class="header-right">
-                    <div class="contact-box">
-                        <div class="owner-name">${escapeHtml(lab.ownerName)}</div>
-                        <div class="phone">
-                            ${whatsappIconDataUrl ? `<img class="whatsapp-icon" src="${whatsappIconDataUrl}" alt="" />` : ''}
-                            ${escapeHtml(lab.phone)}
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="email-row">
-                <span class="email-icon"></span>
-                <span>Email</span> &nbsp;–&nbsp; <span class="email-value">${escapeHtml(lab.email)}</span>
-            </div>
-        </div>
-
         <div class="patient-section">
             <div class="patient-grid">
                 <div class="field">
@@ -569,7 +598,10 @@ async function buildTyagiReportHtml(report, samples = []) {
             </div>
         </div>
 
-        ${groupHtml}
+        ${leadingGroupHtml}
+
+        <div class="report-closing">
+        ${closingGroupHtml}
 
         ${reportRemarks ? `
             <div class="advice-box">
@@ -584,21 +616,25 @@ async function buildTyagiReportHtml(report, samples = []) {
                 <div class="sig-line"></div>
             </div>
         </div>
+        </div>
     </div>
+</div>
+</td></tr>
+</tbody>
+</table>
 
-    <div class="page-footer">
-        <div class="legal-disclaimer">THIS REPORT IS NOT VALID FOR MEDICO - LEGAL PURPOSE</div>
-        <div class="footer">
-            <div class="addr-block">
-                <div class="pin-icon">📍</div>
-                <div class="addr-text">
-                    ADD. – ${formatAddressHtml(lab.address)}
-                </div>
+<div class="page-footer">
+    <div class="legal-disclaimer">THIS REPORT IS NOT VALID FOR MEDICO - LEGAL PURPOSE</div>
+    <div class="footer">
+        <div class="addr-block">
+            <div class="pin-icon">📍</div>
+            <div class="addr-text">
+                ADD. – ${formatAddressHtml(lab.address)}
             </div>
-            <div class="home-collect">
-                <span class="icon">🛵</span>
-                <span>FREE HOME COLLECTION</span>
-            </div>
+        </div>
+        <div class="home-collect">
+            <span class="icon">🛵</span>
+            <span>FREE HOME COLLECTION</span>
         </div>
     </div>
 </div>
@@ -958,6 +994,24 @@ export async function buildReportHtml(report, samples = []) {
     return buildTyagiReportHtml(report, samples);
 }
 
+/** Opens browser print with zero @page margins (unlike printing a PDF blob). */
+export function wrapReportHtmlForPrint(html) {
+    const boot = `<script>
+(function () {
+    function runPrint() {
+        window.focus();
+        window.print();
+    }
+    if (document.readyState === 'complete') {
+        setTimeout(runPrint, 350);
+    } else {
+        window.addEventListener('load', function () { setTimeout(runPrint, 350); });
+    }
+})();
+</script>`;
+    return html.replace('</body>', `${boot}</body>`);
+}
+
 export async function generateReportPdf(report, samples = []) {
     if (!fs.existsSync(REPORTS_DIR)) {
         fs.mkdirSync(REPORTS_DIR, { recursive: true });
@@ -974,7 +1028,8 @@ export async function generateReportPdf(report, samples = []) {
     try {
         page = await browser.newPage();
         await page.setViewport({ width: 794, height: 1123, deviceScaleFactor: 1 });
-        await page.setContent(html, { waitUntil: 'domcontentloaded', timeout: 30000 });
+        await page.setContent(html, { waitUntil: 'domcontentloaded', timeout: 15000 });
+        await page.emulateMediaType('print');
         await page.pdf({
             path: filePath,
             format: 'A4',
@@ -992,11 +1047,21 @@ export async function generateReportPdf(report, samples = []) {
 export async function warmupPdfAssets() {
     const lab = labConfig();
     const { puppeteer } = await loadPdfDeps();
-    await launchPuppeteer(puppeteer);
+    const browser = await launchPuppeteer(puppeteer);
 
     await Promise.all([
         loadAssetDataUrl(lab.logoFile),
+        loadAssetDataUrl('whatsapp.png'),
         lab.useLetterhead ? loadAssetDataUrl(lab.letterheadFile) : Promise.resolve(),
+        (async () => {
+            let page;
+            try {
+                page = await browser.newPage();
+                await page.setContent('<html><body></body></html>', { waitUntil: 'domcontentloaded' });
+            } finally {
+                if (page) await page.close().catch(() => {});
+            }
+        })(),
     ]);
 }
 

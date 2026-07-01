@@ -23,6 +23,9 @@
     --radius-md: 10px;
     --sidebar-width: 252px;
     --content-max: 1240px;
+    --bp-lg: 900px;
+    --bp-md: 768px;
+    --bp-sm: 600px;
     --transition: 0.18s ease;
 }
 
@@ -249,6 +252,25 @@ body {
     flex-wrap: wrap;
 }
 
+.topbar-left {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 0;
+}
+
+.menu-toggle {
+    display: none;
+    flex-shrink: 0;
+    color: var(--brand-blue) !important;
+    width: 2.5rem !important;
+    height: 2.5rem !important;
+}
+
+.topbar-copy {
+    min-width: 0;
+}
+
 .topbar-greeting {
     margin: 0;
     font-size: 1.15rem;
@@ -335,9 +357,27 @@ body {
 .filter-bar .p-inputtext,
 .filter-bar .p-dropdown {
     min-width: 170px;
+    flex: 1 1 170px;
 }
 
-.table-actions { display: flex; gap: 0.1rem; }
+.app-page-content .p-datatable-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.app-page-content .p-datatable-table {
+    min-width: 640px;
+}
+
+.dialog-fluid {
+    width: min(32rem, 95vw) !important;
+}
+
+.dialog-fluid-wide {
+    width: min(480px, 95vw) !important;
+}
+
+.table-actions { display: flex; gap: 0.1rem; flex-wrap: wrap; }
 
 .table-action-btn {
     color: var(--brand-blue) !important;
@@ -365,6 +405,54 @@ body {
 }
 
 .form-field.full-width { grid-column: 1 / -1; }
+
+.whatsapp-share-links {
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+}
+
+.whatsapp-share-link {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.85rem 1rem;
+    border-radius: 8px;
+    background: #25d366;
+    color: #fff;
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.whatsapp-share-link:hover {
+    background: #1ebe57;
+    color: #fff;
+}
+
+.whatsapp-share-link .pi-external-link {
+    margin-left: auto;
+    font-size: 0.85rem;
+    opacity: 0.9;
+}
+
+.whatsapp-share-warning {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.65rem;
+    padding: 0.75rem 0.85rem;
+    margin-bottom: 1rem;
+    border-radius: 8px;
+    background: #fff7ed;
+    border: 1px solid #fdba74;
+    color: #9a3412;
+    font-size: 0.85rem;
+    line-height: 1.45;
+}
+
+.whatsapp-share-warning .pi-exclamation-triangle {
+    margin-top: 0.1rem;
+    flex-shrink: 0;
+}
 
 .form-actions {
     display: flex;
@@ -901,20 +989,166 @@ body {
 }
 
 /* ——— Responsive ——— */
+.sidebar-backdrop {
+    display: none;
+}
+
 @media (max-width: 900px) {
-    .app-shell { flex-direction: column; }
+    .menu-toggle {
+        display: inline-flex;
+    }
+
+    .sidebar-backdrop {
+        display: block;
+        position: fixed;
+        inset: 0;
+        z-index: 24;
+        border: 0;
+        padding: 0;
+        margin: 0;
+        background: rgba(15, 23, 42, 0.45);
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity var(--transition);
+    }
+
+    .app-shell.sidebar-open .sidebar-backdrop {
+        opacity: 1;
+        pointer-events: auto;
+    }
+
     .sidebar {
-        width: 100%;
-        height: auto;
-        position: relative;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: min(280px, 88vw);
+        height: 100vh;
+        height: 100dvh;
+        transform: translateX(-100%);
+        transition: transform var(--transition);
+        z-index: 30;
     }
+
+    .app-shell.sidebar-open .sidebar {
+        transform: translateX(0);
+    }
+
     .sidebar-nav {
-        display: grid;
-        grid-template-columns: repeat(2, 1fr);
-        gap: 0.25rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.2rem;
     }
-    .nav-step { display: none; }
-    .sidebar-footer { display: none; }
-    .app-main { padding: 1rem; }
-    .app-page-content { padding: 1rem; }
+
+    .nav-step {
+        display: inline-flex;
+    }
+
+    .app-main {
+        padding: 0.85rem;
+        width: 100%;
+    }
+
+    .app-page-content {
+        padding: 1rem;
+        min-height: auto;
+    }
+
+    .topbar-greeting {
+        font-size: 1rem;
+    }
+
+    .topbar-date {
+        font-size: 0.75rem;
+    }
+
+    .page-title {
+        font-size: 1.2rem;
+    }
+}
+
+@media (max-width: 600px) {
+    .app-main {
+        padding: 0.65rem;
+    }
+
+    .app-page-content {
+        padding: 0.85rem;
+        border-radius: var(--radius-sm);
+    }
+
+    .page-header {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .page-header-actions {
+        width: 100%;
+    }
+
+    .page-header-actions .p-button {
+        flex: 1 1 auto;
+        justify-content: center;
+    }
+
+    .filter-bar {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .filter-bar .p-inputtext,
+    .filter-bar .p-dropdown,
+    .filter-bar .p-button,
+    .filter-bar .p-input-icon-left {
+        width: 100%;
+        min-width: 0;
+        flex: 1 1 auto;
+    }
+
+    .form-actions {
+        flex-direction: column;
+    }
+
+    .form-actions .p-button {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .table-action-btn {
+        width: 2.5rem !important;
+        height: 2.5rem !important;
+    }
+
+    .pdf-preview-frame {
+        height: calc(100dvh - 260px);
+        min-height: 320px;
+    }
+
+    .p-picklist {
+        flex-direction: column;
+    }
+
+    .p-picklist .p-picklist-list-wrapper,
+    .p-picklist .p-picklist-buttons {
+        width: 100%;
+    }
+
+    .p-picklist .p-picklist-buttons {
+        flex-direction: row;
+        justify-content: center;
+        padding: 0.5rem 0;
+    }
+
+    .widal-grid-wrap {
+        margin-left: -0.25rem;
+        margin-right: -0.25rem;
+    }
+
+    .topbar-status-text {
+        display: none;
+    }
+
+    .topbar-status::after {
+        content: 'Online';
+        font-size: 0.75rem;
+    }
 }

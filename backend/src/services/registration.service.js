@@ -1,40 +1,13 @@
-import prisma from '../lib/prisma.js';
 import { AppError } from '../middleware/errorHandler.js';
-import { parseId } from '../utils/parseId.js';
 import { patientService } from './patient.service.js';
 import { billService } from './bill.service.js';
 import { sampleCollectionService } from './sampleCollection.service.js';
 import { reportGenerationService } from './reportGeneration.service.js';
-import { BILL_TEST_STATUS } from '../utils/billTestStatus.js';
-
-async function autoCollectBillSamples(billId) {
-    const bill = await prisma.bill.findUnique({
-        where: { id: parseId(billId) },
-        include: { billTests: { include: { labTest: true } } },
-    });
-
-    if (!bill) throw new AppError('Bill not found', 404);
-
-    const grouped = {};
-    for (const bt of bill.billTests) {
-        if (bt.status !== BILL_TEST_STATUS.PENDING_SAMPLE) continue;
-        const sampleType = bt.labTest?.sampleType || 'Blood';
-        if (!grouped[sampleType]) grouped[sampleType] = [];
-        grouped[sampleType].push(bt.id);
-    }
-
-    for (const [sampleType, billTestIds] of Object.entries(grouped)) {
-        await sampleCollectionService.collect({
-            bill_id: billId,
-            sample_type: sampleType,
-            bill_test_ids: billTestIds,
-        });
-    }
-}
 
 export const registrationService = {
     async register(data) {
         let patientId = data.patient_id;
+        let patientSummary;
 
         if (!patientId) {
             if (!data.patient?.name?.trim()) {
@@ -44,6 +17,11 @@ export const registrationService = {
             }
             const patient = await patientService.create(data.patient);
             patientId = patient.id;
+            patientSummary = {
+                id: patient.id,
+                patient_no: patient.patient_no,
+                name: patient.name,
+            };
         }
 
         const bill = await billService.create({
@@ -54,12 +32,23 @@ export const registrationService = {
             referred_doctor: data.referred_doctor,
         });
 
-        await autoCollectBillSamples(bill.id);
+        await sampleCollectionService.autoCollectForBill(bill.id);
         const report = await reportGenerationService.generate(bill.id);
 
+        if (!patientSummary) {
+            patientSummary = {
+                id: bill.patient?.id || patientId,
+                patient_no: bill.patient?.patient_no,
+                name: bill.patient?.name,
+            };
+        }
+
         return {
-            patient: await patientService.getById(patientId),
-            bill,
+            patient: patientSummary,
+            bill: {
+                id: bill.id,
+                bill_no: bill.bill_no,
+            },
             report,
         };
     },

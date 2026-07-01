@@ -48,22 +48,27 @@ async function generateBillNo(db = prisma) {
 async function expandBillLineItems(labTestIds = [], profileIds = []) {
     const items = [];
     const seen = new Set();
+    const parsedProfileIds = profileIds.map((id) => parseId(id));
+    const parsedLabTestIds = labTestIds.map((id) => parseId(id));
 
-    for (const profileId of profileIds) {
-        const profile = await prisma.profile.findUnique({
-            where: { id: parseId(profileId) },
+    const profiles = parsedProfileIds.length
+        ? await prisma.profile.findMany({
+            where: { id: { in: parsedProfileIds } },
             include: {
                 items: {
                     orderBy: { sortOrder: 'asc' },
                     include: { labTest: true },
                 },
             },
-        });
+        })
+        : [];
 
+    const profileById = Object.fromEntries(profiles.map((profile) => [profile.id, profile]));
+    for (const profileId of parsedProfileIds) {
+        const profile = profileById[profileId];
         if (!profile) {
             throw new AppError(`Profile not found: ${profileId}`, 422);
         }
-
         if (!profile.items.length) {
             throw new AppError(`Profile "${profile.name}" has no tests.`, 422);
         }
@@ -80,13 +85,16 @@ async function expandBillLineItems(labTestIds = [], profileIds = []) {
         }
     }
 
-    for (const labTestId of labTestIds) {
-        const id = parseId(labTestId);
-        if (seen.has(id)) continue;
+    const missingLabTestIds = parsedLabTestIds.filter((id) => !seen.has(id));
+    const labTests = missingLabTestIds.length
+        ? await prisma.labTest.findMany({ where: { id: { in: missingLabTestIds } } })
+        : [];
+    const labTestById = Object.fromEntries(labTests.map((labTest) => [labTest.id, labTest]));
 
-        const labTest = await prisma.labTest.findUnique({ where: { id } });
+    for (const id of missingLabTestIds) {
+        const labTest = labTestById[id];
         if (!labTest) {
-            throw new AppError(`Lab test not found: ${labTestId}`, 422);
+            throw new AppError(`Lab test not found: ${id}`, 422);
         }
 
         seen.add(id);

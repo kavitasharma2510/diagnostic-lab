@@ -357,7 +357,7 @@ export default function PatientBookingCreate() {
                 header="Edit Patient"
                 visible={editDialogVisible}
                 onHide={() => setEditDialogVisible(false)}
-                style={{ width: '32rem' }}
+                className="dialog-fluid"
                 modal
             >
                 <div className="form-grid">

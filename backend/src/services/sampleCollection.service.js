@@ -224,6 +224,69 @@ export const sampleCollectionService = {
         return this.getById(sample.id);
     },
 
+    async autoCollectForBill(billId) {
+        const id = parseId(billId);
+
+        await prisma.$transaction(async (tx) => {
+            const billTests = await tx.billTest.findMany({
+                where: { billId: id, status: BILL_TEST_STATUS.PENDING_SAMPLE },
+                include: { labTest: true },
+            });
+            if (!billTests.length) return;
+
+            const bill = await tx.bill.findUnique({
+                where: { id },
+                select: { patientId: true },
+            });
+            if (!bill) throw new AppError('Bill not found', 404);
+
+            const grouped = new Map();
+            for (const bt of billTests) {
+                const sampleType = bt.labTest?.sampleType || 'Blood';
+                if (!grouped.has(sampleType)) grouped.set(sampleType, []);
+                grouped.get(sampleType).push(bt);
+            }
+
+            const collectedAt = new Date();
+            for (const [sampleType, tests] of grouped.entries()) {
+                const sampleNo = await generateSampleNo(tx);
+                const barcode = await generateBarcode(tx);
+                const sample = await tx.sample.create({
+                    data: {
+                        billId: id,
+                        patientId: bill.patientId,
+                        sampleNo,
+                        barcode,
+                        sampleType,
+                        status: 'collected',
+                        collectedAt,
+                    },
+                });
+
+                await tx.sampleStatusHistory.createMany({
+                    data: [
+                        { sampleId: sample.id, status: 'pending', remarks: 'Sample record created' },
+                        { sampleId: sample.id, status: 'collected' },
+                    ],
+                });
+
+                await tx.sampleTest.createMany({
+                    data: tests.map((bt) => ({
+                        sampleId: sample.id,
+                        billTestId: bt.id,
+                        labTestId: bt.labTestId,
+                        status: 'collected',
+                    })),
+                });
+
+                await tx.billTest.updateMany({
+                    where: { id: { in: tests.map((bt) => bt.id) } },
+                    data: { status: BILL_TEST_STATUS.COLLECTED },
+                });
+            }
+        });
+    },
+
     async list(filters = {}) {
         const { currentPage, limit, skip } = buildPagination(filters.page, filters.per_page);
         const where = {};

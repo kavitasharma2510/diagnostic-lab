@@ -11,7 +11,7 @@ export default function WidalParameterEditor({ parameters, onChange }) {
     return (
         <div className="widal-param-editor">
             <p className="widal-entry-hint">
-                Widal uses a dilution grid report. Antigens are fixed rows; results are entered as (+) or (-) at each dilution when reporting.
+                Widal uses a dilution grid report. Antigens are fixed rows; enter (+) or (-) only where needed — blank cells are allowed.
             </p>
 
             <WidalLabTestFormat parameters={parameters} />

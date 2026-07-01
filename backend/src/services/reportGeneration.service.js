@@ -7,9 +7,9 @@ import { buildPagination, paginatedResponse, paginatedList } from '../utils/pagi
 import { serialize } from '../utils/serialize.js';
 import { parseId } from '../utils/parseId.js';
 import { detectFlag } from '../utils/flagDetector.js';
-import { generateReportPdf, labConfig, REPORTS_DIR } from '../templates/reportPdfTemplate.js';
+import { generateReportPdf, buildReportHtml, wrapReportHtmlForPrint, labConfig, REPORTS_DIR } from '../templates/reportPdfTemplate.js';
 import { sortRowsByPanelSequence, resolvePanelKey } from '../constants/panelSequences.js';
-import { isWidalCode, isWidalResultComplete } from '../constants/widalFormat.js';
+import { isWidalCode } from '../constants/widalFormat.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -196,6 +196,17 @@ const reportInclude = {
     },
 };
 
+function mapReportSummary(report) {
+    return serialize({
+        id: report.id,
+        report_no: report.reportNo,
+        status: report.status,
+        bill_id: report.billId,
+        patient_id: report.patientId,
+        pdf_path: report.pdfPath,
+    });
+}
+
 export const reportGenerationService = {
     async list(filters = {}) {
         const { currentPage, limit, skip } = buildPagination(filters.page, filters.per_page);
@@ -322,7 +333,7 @@ export const reportGenerationService = {
             },
         });
 
-        return this.getById(report.id);
+        return mapReportSummary(report);
     },
 
     async getById(id) {
@@ -427,7 +438,7 @@ export const reportGenerationService = {
 
         const emptyResults = report.reportTests.filter((rt) => {
             if (isWidalCode(rt.labTest?.code)) {
-                return !isWidalResultComplete(rt.resultValue);
+                return false;
             }
             return !rt.resultValue?.trim();
         });
@@ -454,7 +465,12 @@ export const reportGenerationService = {
             data: { status: 'completed' },
         });
 
-        return this.getById(id);
+        return mapReportSummary({
+            ...report,
+            status: 'approved',
+            pdfPath,
+            approvedAt: new Date(),
+        });
     },
 
     async createPdfForReport(report) {
@@ -513,11 +529,55 @@ export const reportGenerationService = {
         return this.resolvePdfFile(report);
     },
 
-    getPublicPdfUrl(report) {
+    async getPrintHtml(id) {
+        const report = await prisma.labReport.findUnique({
+            where: { id: parseId(id) },
+            include: reportInclude,
+        });
+        if (!report) throw new AppError('Report not found', 404);
+        if (report.status !== 'approved') {
+            throw new AppError('Approve the report before printing.', 400);
+        }
+
+        const samples = await prisma.sample.findMany({
+            where: { billId: report.billId, status: { in: ['collected', 'processing', 'completed'] } },
+            orderBy: { collectedAt: 'asc' },
+            include: { collectedBy: { select: { name: true } } },
+        });
+
+        const html = await buildReportHtml(report, samples);
+        return wrapReportHtmlForPrint(html);
+    },
+
+    getPublicShareUrl(report) {
         const base = labConfig().appUrl.replace(/\/$/, '');
+        const pdfRelative = report.pdf_path || report.pdfPath;
+        if (pdfRelative) {
+            const pathPart = pdfRelative.startsWith('/') ? pdfRelative : `/${pdfRelative}`;
+            return `${base}${pathPart}`;
+        }
+
+        const reportNo = report.report_no || report.reportNo;
+        if (reportNo) {
+            return `${base}/report/download/${encodeURIComponent(reportNo)}`;
+        }
+
         const reportId = report.id;
         if (!reportId) return null;
         return `${base}/api/reports/${reportId}/download`;
+    },
+
+    getPublicPdfUrl(report) {
+        return this.getPublicShareUrl(report);
+    },
+
+    async getDownloadByReportNo(reportNo) {
+        const report = await prisma.labReport.findUnique({
+            where: { reportNo },
+            include: reportInclude,
+        });
+        if (!report) throw new AppError('Report not found', 404);
+        return this.resolvePdfFile(report);
     },
 
     async remove(id) {

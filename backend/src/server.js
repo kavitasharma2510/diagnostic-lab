@@ -65,6 +65,7 @@ app.use('/api/samples', samplesRouter);
 app.use('/api/reports', reportsRouter);
 app.use('/api/registrations', registrationsRouter);
 
+app.get('/report/download/:reportNo', asyncHandler(reportController.publicDownload));
 app.get('/report/verify/:reportNo', asyncHandler(reportController.verify));
 
 app.use(errorHandler);
