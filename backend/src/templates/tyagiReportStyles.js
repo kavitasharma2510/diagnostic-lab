@@ -26,7 +26,6 @@ export function getTyagiReportStyles() {
         }
         .page {
             width: 100%;
-            min-height: 297mm;
             background: #fff;
             margin: 0;
             position: relative;
