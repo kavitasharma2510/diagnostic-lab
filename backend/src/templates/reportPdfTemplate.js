@@ -343,6 +343,46 @@ function renderTyagiPanelTitle(group) {
     return `${heading} Report`;
 }
 
+function isFbsPanel(group) {
+    const heading = String(group?.heading || '').toLowerCase();
+    const code = String(group?.code || '').toLowerCase();
+    const hasFbsInHeading = heading.includes('fasting blood sugar') || heading.includes('fasting glucose') || heading.includes('fbs');
+    const hasFbsInCode = code === 'fbs' || code.includes('fbs');
+    return hasFbsInHeading || hasFbsInCode;
+}
+
+function renderFbsReferenceTable() {
+    return `
+        <div class="fbs-reference">
+            <table class="fbs-ref-table">
+                <thead>
+                    <tr>
+                        <th>Fasting Glucose</th>
+                        <th>2 hours PP Glucose</th>
+                        <th>Diagnosis</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>&lt;100</td>
+                        <td>&lt;140</td>
+                        <td>Normal</td>
+                    </tr>
+                    <tr>
+                        <td>100 to 125</td>
+                        <td>140 to 199</td>
+                        <td>Pre Diabetes</td>
+                    </tr>
+                    <tr>
+                        <td>&gt;126</td>
+                        <td>&gt;200</td>
+                        <td>Diabetes</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>`;
+}
+
 function renderWidalTestSection(group) {
     const antigenRows = buildWidalAntigenRows(group.rows);
     const overall = computeWidalOverall(antigenRows);
@@ -417,6 +457,7 @@ function renderTyagiTestSection(group) {
                     </tbody>
                 </table>
             </div>
+            ${isFbsPanel(group) ? renderFbsReferenceTable() : ''}
             ${group.interpretation ? `
                 <div class="advice-box">
                     <div class="advice-title">Interpretation</div>
@@ -529,11 +570,39 @@ async function buildTyagiReportHtml(report, samples = []) {
     const logoClass = portraitLogo
         ? (stackedLogo ? 'lab-logo--stacked' : 'lab-logo--portrait')
         : '';
-    const brandBlock = `${logoDataUrl ? `<img class="lab-logo ${logoClass}" src="${logoDataUrl}" alt="${escapeHtml(lab.name)}" />` : ''}
-                    <div class="brand-name ${stackedLogo ? 'brand-name--centered' : ''}">
+    const logoHtml = logoDataUrl
+        ? `<img class="lab-logo ${logoClass}" src="${logoDataUrl}" alt="${escapeHtml(lab.name)}" />`
+        : '';
+    const brandHtml = `
+                    <div class="brand-name">
                         <h1><span class="brand-tyagi">${escapeHtml(lab.namePart1)}</span> <span class="brand-pathology">${escapeHtml(lab.namePart2)}</span></h1>
                         <div class="tagline">${escapeHtml(lab.tagline)}</div>
                     </div>`;
+    const contactHtml = `
+            <div class="header-right">
+                <div class="contact-box">
+                    <div class="owner-name">${escapeHtml(lab.ownerName)}</div>
+                    <div class="phone">
+                        ${whatsappIconDataUrl ? `<img class="whatsapp-icon" src="${whatsappIconDataUrl}" alt="" />` : ''}
+                        ${escapeHtml(lab.phone)}
+                    </div>
+                </div>
+            </div>`;
+    const headerTopHtml = stackedLogo
+        ? `<div class="header-top header-top--centered">
+            <div class="header-brand header-brand--stacked">
+                ${logoHtml}
+                ${brandHtml}
+            </div>
+            ${contactHtml}
+        </div>`
+        : `<div class="header-top">
+            <div class="header-brand ${portraitLogo ? 'header-brand--portrait' : ''}">
+                ${logoHtml}
+                ${brandHtml}
+            </div>
+            ${contactHtml}
+        </div>`;
 
     return `<!DOCTYPE html>
 <html lang="en">
@@ -549,20 +618,7 @@ async function buildTyagiReportHtml(report, samples = []) {
 <tr><td>
 <div class="page-header">
     <div class="header">
-        <div class="header-top ${stackedLogo ? 'header-top--centered' : ''}">
-            <div class="header-brand ${stackedLogo ? 'header-brand--stacked' : portraitLogo ? 'header-brand--portrait' : ''}">
-                ${brandBlock}
-            </div>
-            <div class="header-right">
-                <div class="contact-box">
-                    <div class="owner-name">${escapeHtml(lab.ownerName)}</div>
-                    <div class="phone">
-                        ${whatsappIconDataUrl ? `<img class="whatsapp-icon" src="${whatsappIconDataUrl}" alt="" />` : ''}
-                        ${escapeHtml(lab.phone)}
-                    </div>
-                </div>
-            </div>
-        </div>
+        ${headerTopHtml}
         <div class="email-row">
             <span class="email-icon"></span>
             <span>Email</span> &nbsp;–&nbsp; <span class="email-value">${escapeHtml(lab.email)}</span>

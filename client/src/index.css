@@ -945,6 +945,29 @@ body {
     margin-top: 0.5rem;
 }
 
+.fbs-reference {
+    margin-top: 1rem;
+}
+
+.fbs-ref-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+}
+
+.fbs-ref-table th,
+.fbs-ref-table td {
+    border: 1px dashed #cfd3da;
+    padding: 0.45rem 0.6rem;
+    text-align: left;
+}
+
+.fbs-ref-table thead th {
+    background: #f8f9fc;
+    font-weight: 800;
+    color: #1a2a5e;
+}
+
 .widal-param-editor {
     display: flex;
     flex-direction: column;

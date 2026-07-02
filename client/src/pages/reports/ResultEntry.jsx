@@ -13,7 +13,38 @@ import PageHeader from '../../components/PageHeader';
 import { reportService } from '../../services/api';
 import { useToast } from '../../context/ToastContext';
 import WidalResultGrid from '../../components/WidalResultGrid';
+import FbsReferenceTable from '../../components/FbsReferenceTable';
 import { isWidalReportRow, WIDAL_DEFAULT_ANTIGENS } from '../../utils/widal';
+import { hasFbsResults } from '../../utils/fbs';
+
+const RESULT_GRID_COLS = 3;
+
+function bindResultGridInput(el, row, col) {
+    if (!el) return;
+    el.dataset.resultGrid = 'true';
+    el.dataset.row = String(row);
+    el.dataset.col = String(col);
+}
+
+function moveResultGridFocus(e, row, col, rowCount) {
+    const { key } = e;
+    if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(key)) return;
+
+    let nextRow = row;
+    let nextCol = col;
+
+    if (key === 'ArrowUp') nextRow = row - 1;
+    else if (key === 'ArrowDown') nextRow = row + 1;
+    else if (key === 'ArrowLeft') nextCol = col - 1;
+    else if (key === 'ArrowRight') nextCol = col + 1;
+
+    if (nextRow < 0 || nextRow >= rowCount || nextCol < 0 || nextCol >= RESULT_GRID_COLS) return;
+
+    e.preventDefault();
+    document.querySelector(
+        `input[data-result-grid="true"][data-row="${nextRow}"][data-col="${nextCol}"]`,
+    )?.focus();
+}
 
 function buildResultPayload(results) {
     return results.map((r) => ({
@@ -86,6 +117,7 @@ export default function ResultEntry() {
             return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
         });
     const standardResults = results.filter((r) => !isWidalReportRow(r, results));
+    const showFbsReference = hasFbsResults(standardResults);
 
     async function saveDraft() {
         if (!report) return;
@@ -183,10 +215,12 @@ export default function ResultEntry() {
                         <Column field="test_name" header="Test / Parameter" />
                         <Column
                             header="Result"
-                            body={(r) => (
+                            body={(r, { rowIndex }) => (
                                 <InputText
                                     value={r.result_value}
                                     onChange={(e) => updateResult(r.id, 'result_value', e.target.value)}
+                                    onKeyDown={(e) => moveResultGridFocus(e, rowIndex, 0, standardResults.length)}
+                                    inputRef={(el) => bindResultGridInput(el, rowIndex, 0)}
                                     disabled={isApproved}
                                     className="w-full"
                                 />
@@ -194,10 +228,12 @@ export default function ResultEntry() {
                         />
                         <Column
                             header="Unit"
-                            body={(r) => (
+                            body={(r, { rowIndex }) => (
                                 <InputText
                                     value={r.unit}
                                     onChange={(e) => updateResult(r.id, 'unit', e.target.value)}
+                                    onKeyDown={(e) => moveResultGridFocus(e, rowIndex, 1, standardResults.length)}
+                                    inputRef={(el) => bindResultGridInput(el, rowIndex, 1)}
                                     disabled={isApproved}
                                     className="w-full"
                                 />
@@ -205,10 +241,12 @@ export default function ResultEntry() {
                         />
                         <Column
                             header="Reference Range"
-                            body={(r) => (
+                            body={(r, { rowIndex }) => (
                                 <InputText
                                     value={r.reference_range}
                                     onChange={(e) => updateResult(r.id, 'reference_range', e.target.value)}
+                                    onKeyDown={(e) => moveResultGridFocus(e, rowIndex, 2, standardResults.length)}
+                                    inputRef={(el) => bindResultGridInput(el, rowIndex, 2)}
                                     disabled={isApproved}
                                     className="w-full"
                                 />
@@ -216,6 +254,7 @@ export default function ResultEntry() {
                         />
                     </DataTable>
                 )}
+                {showFbsReference && <FbsReferenceTable />}
             </Card>
 
             <Card title="Report Remarks">
