@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath, pathToFileURL } from 'url';
 import { launchPuppeteer } from '../utils/puppeteerLaunch.js';
-import { detectFlag } from '../utils/flagDetector.js';
+import { resolveResultFlag } from '../utils/flagDetector.js';
 import { sortRowsByPanelSequence, resolvePanelKey } from '../constants/panelSequences.js';
 import {
     WIDAL_DILUTIONS,
@@ -184,24 +184,11 @@ function tyagiResultClass(flag) {
     return '';
 }
 
-function parseReferenceBounds(referenceRange) {
-    if (!referenceRange) return { min: null, max: null };
-    const text = String(referenceRange);
-    const rangeMatch = text.match(/([\d.]+)\s*[-–—]\s*([\d.]+)/);
-    if (rangeMatch) {
-        return { min: Number(rangeMatch[1]), max: Number(rangeMatch[2]) };
-    }
-    const ltMatch = text.match(/<\s*([\d.]+)/);
-    if (ltMatch) return { min: null, max: Number(ltMatch[1]) };
-    const gtMatch = text.match(/>\s*([\d.]+)/);
-    if (gtMatch) return { min: Number(gtMatch[1]), max: null };
-    return { min: null, max: null };
-}
-
-function tyagiRowFlag(row) {
-    if (row.flag === 'High' || row.flag === 'Low') return row.flag;
-    const { min, max } = parseReferenceBounds(row.referenceRange);
-    return detectFlag(row.resultValue, min, max);
+function tyagiRowFlag(row, gender) {
+    return resolveResultFlag(row.resultValue, {
+        referenceRange: row.referenceRange,
+        gender,
+    });
 }
 
 function formatTyagiResult(value, flag) {
@@ -309,9 +296,9 @@ function renderDrlogyTableRows(rows) {
     }).join('');
 }
 
-function renderTyagiTableRows(rows) {
+function renderTyagiTableRows(rows, gender) {
     return rows.map((r) => {
-        const flag = tyagiRowFlag(r);
+        const flag = tyagiRowFlag(r, gender);
         const resultCls = tyagiResultClass(flag);
         const rowCls = flag === 'High' || flag === 'Low' ? 'row-abnormal' : '';
         const resultClsAttr = resultCls ? ` class="${resultCls}"` : '';
@@ -434,7 +421,7 @@ function renderWidalTestSection(group) {
         </div>`;
 }
 
-function renderTyagiTestSection(group) {
+function renderTyagiTestSection(group, gender) {
     if (group.layout === 'widal') return renderWidalTestSection(group);
     const title = renderTyagiPanelTitle(group);
     return `
@@ -453,7 +440,7 @@ function renderTyagiTestSection(group) {
                         </tr>
                     </thead>
                     <tbody>
-                        ${renderTyagiTableRows(group.rows)}
+                        ${renderTyagiTableRows(group.rows, gender)}
                     </tbody>
                 </table>
             </div>
@@ -559,11 +546,8 @@ async function buildTyagiReportHtml(report, samples = []) {
     const ageSexText = [ageText, sexText].filter(Boolean).join(' / ');
     const groups = groupReportTests(report.reportTests || []);
     const reportedAt = report.approvedAt || report.preparedAt || report.createdAt;
-    const lastGroup = groups.length ? groups[groups.length - 1] : null;
-    const leadingGroupHtml = groups.length > 1
-        ? groups.slice(0, -1).map((group) => renderTyagiTestSection(group)).join('')
-        : '';
-    const closingGroupHtml = lastGroup ? renderTyagiTestSection(lastGroup) : '';
+    const patientGender = patient?.gender || '';
+    const groupsHtml = groups.map((group) => renderTyagiTestSection(group, patientGender)).join('');
     const reportRemarks = report.remarks || '';
     const portraitLogo = isPortraitLogo(lab.logoFile);
     const stackedLogo = portraitLogo && lab.logoLayout === 'stacked';
@@ -635,29 +619,32 @@ async function buildTyagiReportHtml(report, samples = []) {
     <div class="page-content">
         <div class="patient-section">
             <div class="patient-grid">
-                <div class="field">
-                    <span class="label">Patient Name</span>
-                    <span class="value">${escapeHtml(patient?.name || '')}</span>
+                <div class="patient-col">
+                    <div class="field">
+                        <span class="label">Patient Name</span>
+                        <span class="value">${escapeHtml(patient?.name || '')}</span>
+                    </div>
+                    <div class="field">
+                        <span class="label">Ref.Doctor</span>
+                        <span class="value">${escapeHtml(report.bill?.referredDoctor || '')}</span>
+                    </div>
                 </div>
-                <div class="field">
-                    <span class="label">Age / Sex</span>
-                    <span class="value">${escapeHtml(ageSexText)}</span>
-                </div>
-                <div class="field">
-                    <span class="label">Ref.Doctor</span>
-                    <span class="value">${escapeHtml(report.bill?.referredDoctor || '')}</span>
-                </div>
-                <div class="field">
-                    <span class="label">Date</span>
-                    <span class="value">${formatDate(reportedAt)}</span>
+                <div class="patient-col">
+                    <div class="field">
+                        <span class="label">Age / Sex</span>
+                        <span class="value">${escapeHtml(ageSexText)}</span>
+                    </div>
+                    <div class="field">
+                        <span class="label">Date</span>
+                        <span class="value">${formatDate(reportedAt)}</span>
+                    </div>
                 </div>
             </div>
         </div>
 
-        ${leadingGroupHtml}
+        ${groupsHtml}
 
         <div class="report-closing">
-        ${closingGroupHtml}
 
         ${reportRemarks ? `
             <div class="advice-box">
@@ -830,7 +817,7 @@ async function buildDrlogyReportHtml(report, samples = []) {
         .time-row strong { color: #1565c0; }
 
         /* ── Category + results table ── */
-        .test-section { margin-bottom: 12px; page-break-inside: avoid; }
+        .test-section { margin-bottom: 12px; page-break-inside: auto; break-inside: auto; }
         .category-subtitle {
             text-align: center; font-size: 9px; font-weight: 700;
             color: #546e7a; text-transform: uppercase; letter-spacing: 0.6px;

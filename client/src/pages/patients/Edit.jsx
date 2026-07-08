@@ -54,7 +54,15 @@ export default function PatientEdit() {
         setLoading(true);
         setErrors({});
         try {
-            await patientService.update(id, form);
+            const payload = {
+                name: form.name.trim(),
+                age: form.age ?? undefined,
+                gender: form.gender || undefined,
+                mobile: form.mobile || undefined,
+                address: form.address || undefined,
+                referring_doctor: form.referring_doctor || undefined,
+            };
+            await patientService.update(id, payload);
             toast.success('Patient updated');
             navigate(`/patients/${id}`);
         } catch (err) {

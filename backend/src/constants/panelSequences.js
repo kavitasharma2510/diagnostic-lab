@@ -52,6 +52,7 @@ export const PANEL_PARAMETERS = {
     ],
     FBS: [
         { name: 'GLUCOSE, FASTING, PLASMA', unit: 'mg/dL', reference_range: '70.00 - 100.00', min_value: 70, max_value: 100, method: 'Hexokinase' },
+        { name: 'BLOOD SUGAR PP', unit: 'mg/dL', reference_range: '< 140', max_value: 140, method: 'Hexokinase' },
     ],
     CRP: [
         { name: 'C-REACTIVE PROTEIN', unit: 'mg/dL', reference_range: '0.0 - 5', min_value: 0, max_value: 5, method: 'Immunoturbidimetry' },
@@ -165,6 +166,7 @@ const PANEL_NAME_ALIASES = {
     },
     FBS: {
         'glucose,fasting,plasma': 0, 'glucose, fasting, plasma': 0, fbs: 0, 'fasting blood sugar': 0,
+        'blood sugar pp': 1, 'pp blood sugar': 1, 'glucose pp': 1, 'post prandial glucose': 1,
     },
     CRP: {
         'c-reactive protein': 0, crp: 0, 'c reactive protein': 0,

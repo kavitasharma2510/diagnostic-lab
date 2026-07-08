@@ -114,7 +114,14 @@ export default function PatientBookingCreate() {
         setEditLoading(true);
         setEditErrors({});
         try {
-            await patientService.update(editingPatientId, editForm);
+            const payload = {
+                name: editForm.name.trim(),
+                age: editForm.age ?? undefined,
+                gender: editForm.gender || undefined,
+                mobile: editForm.mobile || undefined,
+                referring_doctor: editForm.referring_doctor || undefined,
+            };
+            await patientService.update(editingPatientId, payload);
             await loadPatients();
             toast.success('Patient updated');
             setEditDialogVisible(false);

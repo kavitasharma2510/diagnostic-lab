@@ -56,7 +56,7 @@ export function getTyagiReportStyles() {
             justify-content: space-between;
             gap: 16px;
             width: 100%;
-            min-height: 88px;
+            min-height: 108px;
         }
         .header-brand {
             display: flex;
@@ -88,39 +88,37 @@ export function getTyagiReportStyles() {
             text-align: center;
         }
         .lab-logo {
-            height: 98px;
+            height: 118px;
             width: auto;
-            max-width: 260px;
+            max-width: 300px;
             object-fit: contain;
             display: block;
             flex-shrink: 0;
         }
         .lab-logo--stacked {
-            height: 128px;
-            max-width: 240px;
+            height: 150px;
+            max-width: 280px;
         }
         .lab-logo--portrait {
-            height: 118px;
-            max-width: 148px;
+            height: 130px;
+            max-width: 175px;
         }
         .header-brand--portrait {
-            --brand-pair-height: 74px;
             flex-direction: row;
             align-items: center;
-            gap: 8px;
-            height: var(--brand-pair-height);
+            gap: 10px;
         }
         .header-brand--portrait .lab-logo,
         .header-brand--portrait .lab-logo--portrait {
-            height: var(--brand-pair-height);
+            height: 120px;
             width: auto;
             max-width: none;
-            max-height: var(--brand-pair-height);
+            max-height: none;
             object-fit: contain;
             align-self: center;
         }
         .header-brand--portrait .brand-name {
-            height: var(--brand-pair-height);
+            height: auto;
             display: flex;
             flex-direction: column;
             justify-content: center;
@@ -162,6 +160,7 @@ export function getTyagiReportStyles() {
             display: flex;
             align-items: center;
             gap: 6px;
+            margin-left: 18px;
             font-size: 12px;
             font-weight: 700;
             color: #1a2a5e;
@@ -212,31 +211,48 @@ export function getTyagiReportStyles() {
             flex-shrink: 0;
         }
         .patient-section {
-            padding: 10px 30px 8px;
-            background: #f8f9fc;
-            border-bottom: 1px solid #ddd;
+            padding: 12px 30px 10px;
+            background: #f4f5f8;
+            border-bottom: 1px solid #dde1e8;
         }
         .patient-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 6px 20px;
-            font-size: 12.5px;
+            display: flex;
+            gap: 28px;
         }
-        .patient-grid .field { display: flex; gap: 6px; }
+        .patient-col {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            min-width: 0;
+        }
+        .patient-grid .field {
+            display: flex;
+            align-items: baseline;
+            gap: 10px;
+            font-size: 13px;
+            line-height: 1.35;
+        }
         .patient-grid .label {
             font-weight: 700;
             color: #1a2a5e;
-            min-width: 70px;
+            width: 88px;
+            flex-shrink: 0;
+            white-space: nowrap;
         }
         .patient-grid .value {
-            color: #222;
-            border-bottom: 1px dotted #aaa;
             flex: 1;
-            padding-bottom: 1px;
+            min-width: 0;
+            color: #222;
+            font-weight: 400;
+            border-bottom: 1px dotted #8a8a8a;
+            padding-bottom: 2px;
         }
         .report-title {
             text-align: center;
             padding: 10px 30px 4px;
+            page-break-after: avoid;
+            break-after: avoid;
         }
         .category-subtitle {
             text-align: center;
@@ -276,7 +292,11 @@ export function getTyagiReportStyles() {
         table.report thead th:not(:first-child) {
             border-left: 1px solid rgba(255,255,255,0.2);
         }
-        table.report tbody tr { border-bottom: 0.5px solid #e0e0e0; }
+        table.report tbody tr {
+            border-bottom: 0.5px solid #e0e0e0;
+            page-break-inside: avoid;
+            break-inside: avoid;
+        }
         table.report tbody tr:nth-child(even) { background: #f5f7fc; }
         table.report tbody tr.row-abnormal td {
             font-weight: 700;
@@ -446,12 +466,12 @@ export function getTyagiReportStyles() {
             padding-bottom: 32mm;
         }
         .panel-section {
-            page-break-inside: avoid;
-            break-inside: avoid;
+            page-break-inside: auto;
+            break-inside: auto;
         }
         .report-closing {
-            page-break-inside: avoid;
-            break-inside: avoid;
+            page-break-inside: auto;
+            break-inside: auto;
         }
         .widal-section { margin: 10px 30px 14px; }
         .widal-section .report-table-wrap {

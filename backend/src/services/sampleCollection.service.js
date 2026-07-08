@@ -33,6 +33,37 @@ async function generateBarcode(db = prisma) {
     return `${prefix}${String(sequence).padStart(5, '0')}`;
 }
 
+async function reserveSampleIdentifiers(db) {
+    const today = new Date();
+    const samplePrefix = `SMP-${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`;
+    const barcodePrefix = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`;
+
+    const [lastSample, lastBarcode] = await Promise.all([
+        db.sample.findFirst({
+            where: { sampleNo: { startsWith: samplePrefix } },
+            orderBy: { sampleNo: 'desc' },
+        }),
+        db.sample.findFirst({
+            where: { barcode: { startsWith: barcodePrefix } },
+            orderBy: { barcode: 'desc' },
+        }),
+    ]);
+
+    let sampleSequence = lastSample ? Number(lastSample.sampleNo.split('-').pop()) : 0;
+    let barcodeSequence = lastBarcode ? Number(lastBarcode.barcode.slice(barcodePrefix.length)) : 0;
+
+    return {
+        nextSampleNo() {
+            sampleSequence += 1;
+            return `${samplePrefix}-${String(sampleSequence).padStart(4, '0')}`;
+        },
+        nextBarcode() {
+            barcodeSequence += 1;
+            return `${barcodePrefix}${String(barcodeSequence).padStart(5, '0')}`;
+        },
+    };
+}
+
 async function recordStatus(db, sampleId, status, changedById = null, remarks = null) {
     await db.sampleStatusHistory.create({
         data: {
@@ -247,10 +278,11 @@ export const sampleCollectionService = {
                 grouped.get(sampleType).push(bt);
             }
 
+            const identifiers = await reserveSampleIdentifiers(tx);
             const collectedAt = new Date();
             for (const [sampleType, tests] of grouped.entries()) {
-                const sampleNo = await generateSampleNo(tx);
-                const barcode = await generateBarcode(tx);
+                const sampleNo = identifiers.nextSampleNo();
+                const barcode = identifiers.nextBarcode();
                 const sample = await tx.sample.create({
                     data: {
                         billId: id,
@@ -284,7 +316,7 @@ export const sampleCollectionService = {
                     data: { status: BILL_TEST_STATUS.COLLECTED },
                 });
             }
-        });
+        }, { timeout: 15000 });
     },
 
     async list(filters = {}) {

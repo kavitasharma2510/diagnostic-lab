@@ -6,7 +6,7 @@ import { AppError } from '../middleware/errorHandler.js';
 import { buildPagination, paginatedResponse, paginatedList } from '../utils/pagination.js';
 import { serialize } from '../utils/serialize.js';
 import { parseId } from '../utils/parseId.js';
-import { detectFlag } from '../utils/flagDetector.js';
+import { detectFlag, resolveResultFlag } from '../utils/flagDetector.js';
 import { generateReportPdf, buildReportHtml, wrapReportHtmlForPrint, labConfig, REPORTS_DIR } from '../templates/reportPdfTemplate.js';
 import { sortRowsByPanelSequence, resolvePanelKey } from '../constants/panelSequences.js';
 import { isWidalCode } from '../constants/widalFormat.js';
@@ -374,7 +374,7 @@ export const reportGenerationService = {
 
         const report = await prisma.labReport.findUnique({
             where: { id: parseId(id) },
-            include: { reportTests: true },
+            include: { reportTests: true, patient: true },
         });
 
         if (!report) throw new AppError('Report not found', 404);
@@ -402,7 +402,12 @@ export const reportGenerationService = {
             const maxValue = item.max_value ?? param?.maxValue ?? labTest?.maxValue;
             const flag = isWidalCode(labTest?.code)
                 ? null
-                : detectFlag(item.result_value, minValue, maxValue);
+                : resolveResultFlag(item.result_value, {
+                    referenceRange: item.reference_range !== undefined ? item.reference_range : existing.referenceRange,
+                    minValue,
+                    maxValue,
+                    gender: report.patient?.gender,
+                });
 
             await prisma.labReportTest.update({
                 where: { id: item.id },
