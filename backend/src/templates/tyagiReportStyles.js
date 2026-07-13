@@ -473,9 +473,9 @@ export function getTyagiReportStyles() {
             page-break-inside: avoid;
             break-inside: avoid;
         }
-        .panel-section--page-start {
-            page-break-before: always;
-            break-before: page;
+        .panel-section--cbc-alone {
+            page-break-after: always;
+            break-after: page;
         }
         .report--cbc thead th {
             padding: 5px 8px;

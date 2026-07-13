@@ -380,16 +380,11 @@ function renderFbsReferenceTable() {
         </div>`;
 }
 
-function renderWidalTestSection(group, { forceNewPage = false } = {}) {
+function renderWidalTestSection(group) {
     const antigenRows = buildWidalAntigenRows(group.rows);
     const overall = computeWidalOverall(antigenRows);
     const note = buildWidalNote(antigenRows);
     const overallCls = overall === 'POSITIVE' ? 'widal-overall positive' : 'widal-overall';
-    const sectionClass = [
-        'panel-section',
-        'widal-section',
-        forceNewPage ? 'panel-section--page-start' : '',
-    ].filter(Boolean).join(' ');
 
     const gridRows = antigenRows.map((row) => `
         <tr>
@@ -400,7 +395,7 @@ function renderWidalTestSection(group, { forceNewPage = false } = {}) {
         </tr>`).join('');
 
     return `
-        <div class="${sectionClass}">
+        <div class="panel-section widal-section">
             <div class="widal-title">** REPORT ON THE WIDAL TEST</div>
             <div class="report-table-wrap">
                 <table class="report widal-summary">
@@ -436,14 +431,14 @@ function renderWidalTestSection(group, { forceNewPage = false } = {}) {
         </div>`;
 }
 
-function renderTyagiTestSection(group, gender, { forceNewPage = false } = {}) {
-    if (group.layout === 'widal') return renderWidalTestSection(group, { forceNewPage });
+function renderTyagiTestSection(group, gender, { cbcAlone = false } = {}) {
+    if (group.layout === 'widal') return renderWidalTestSection(group);
     const title = renderTyagiPanelTitle(group);
     const isCbc = isCbcPanel(group);
     const sectionClass = [
         'panel-section',
         isCbc ? 'panel-section--cbc' : '',
-        forceNewPage ? 'panel-section--page-start' : '',
+        cbcAlone ? 'panel-section--cbc-alone' : '',
     ].filter(Boolean).join(' ');
     return `
         <div class="${sectionClass}">
@@ -575,12 +570,12 @@ async function buildTyagiReportHtml(report, samples = []) {
             ...groups.filter((group) => !isCbcPanel(group)),
         ]
         : groups;
-    let sawCbc = false;
+    const nonCbcCount = orderedGroups.filter((group) => !isCbcPanel(group)).length;
     const groupsHtml = orderedGroups.map((group) => {
         const isCbc = isCbcPanel(group);
-        const forceNewPage = hasCbc && sawCbc && !isCbc;
-        if (isCbc) sawCbc = true;
-        return renderTyagiTestSection(group, patientGender, { forceNewPage });
+        return renderTyagiTestSection(group, patientGender, {
+            cbcAlone: isCbc && nonCbcCount > 0,
+        });
     }).join('');
     const reportRemarks = report.remarks || '';
     const portraitLogo = isPortraitLogo(lab.logoFile);
