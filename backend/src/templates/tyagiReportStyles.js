@@ -469,6 +469,28 @@ export function getTyagiReportStyles() {
             page-break-inside: auto;
             break-inside: auto;
         }
+        .panel-section--cbc {
+            page-break-inside: avoid;
+            break-inside: avoid;
+        }
+        .panel-section--page-start {
+            page-break-before: always;
+            break-before: page;
+        }
+        .report--cbc thead th {
+            padding: 5px 8px;
+            font-size: 11.5px;
+        }
+        .report--cbc tbody td {
+            padding: 4px 8px;
+            font-size: 12px;
+        }
+        .panel-section--cbc .report-title {
+            padding: 6px 30px 2px;
+        }
+        .panel-section--cbc .report-table-wrap {
+            padding: 4px 30px 6px;
+        }
         .report-closing {
             page-break-inside: auto;
             break-inside: auto;

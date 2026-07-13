@@ -338,6 +338,16 @@ function isFbsPanel(group) {
     return hasFbsInHeading || hasFbsInCode;
 }
 
+function isCbcPanel(group) {
+    const panelKey = resolvePanelKey(group?.code) || resolvePanelKey(group?.categoryCode);
+    if (panelKey === 'CBC') return true;
+    const heading = String(group?.heading || '').toLowerCase();
+    const code = String(group?.code || '').toLowerCase();
+    return code === 'cbc'
+        || heading.includes('complete blood count')
+        || /\bcbc\b/.test(heading);
+}
+
 function renderFbsReferenceTable() {
     return `
         <div class="fbs-reference">
@@ -370,11 +380,16 @@ function renderFbsReferenceTable() {
         </div>`;
 }
 
-function renderWidalTestSection(group) {
+function renderWidalTestSection(group, { forceNewPage = false } = {}) {
     const antigenRows = buildWidalAntigenRows(group.rows);
     const overall = computeWidalOverall(antigenRows);
     const note = buildWidalNote(antigenRows);
     const overallCls = overall === 'POSITIVE' ? 'widal-overall positive' : 'widal-overall';
+    const sectionClass = [
+        'panel-section',
+        'widal-section',
+        forceNewPage ? 'panel-section--page-start' : '',
+    ].filter(Boolean).join(' ');
 
     const gridRows = antigenRows.map((row) => `
         <tr>
@@ -385,7 +400,7 @@ function renderWidalTestSection(group) {
         </tr>`).join('');
 
     return `
-        <div class="panel-section widal-section">
+        <div class="${sectionClass}">
             <div class="widal-title">** REPORT ON THE WIDAL TEST</div>
             <div class="report-table-wrap">
                 <table class="report widal-summary">
@@ -421,16 +436,22 @@ function renderWidalTestSection(group) {
         </div>`;
 }
 
-function renderTyagiTestSection(group, gender) {
-    if (group.layout === 'widal') return renderWidalTestSection(group);
+function renderTyagiTestSection(group, gender, { forceNewPage = false } = {}) {
+    if (group.layout === 'widal') return renderWidalTestSection(group, { forceNewPage });
     const title = renderTyagiPanelTitle(group);
+    const isCbc = isCbcPanel(group);
+    const sectionClass = [
+        'panel-section',
+        isCbc ? 'panel-section--cbc' : '',
+        forceNewPage ? 'panel-section--page-start' : '',
+    ].filter(Boolean).join(' ');
     return `
-        <div class="panel-section">
+        <div class="${sectionClass}">
             <div class="report-title">
                 <h2>${escapeHtml(title)}</h2>
             </div>
             <div class="report-table-wrap">
-                <table class="report">
+                <table class="report ${isCbc ? 'report--cbc' : ''}">
                     <thead>
                         <tr>
                             <th style="width:30%">Investigation</th>
@@ -547,7 +568,20 @@ async function buildTyagiReportHtml(report, samples = []) {
     const groups = groupReportTests(report.reportTests || []);
     const reportedAt = report.approvedAt || report.preparedAt || report.createdAt;
     const patientGender = patient?.gender || '';
-    const groupsHtml = groups.map((group) => renderTyagiTestSection(group, patientGender)).join('');
+    const hasCbc = groups.some((group) => isCbcPanel(group));
+    const orderedGroups = hasCbc
+        ? [
+            ...groups.filter((group) => isCbcPanel(group)),
+            ...groups.filter((group) => !isCbcPanel(group)),
+        ]
+        : groups;
+    let sawCbc = false;
+    const groupsHtml = orderedGroups.map((group) => {
+        const isCbc = isCbcPanel(group);
+        const forceNewPage = hasCbc && sawCbc && !isCbc;
+        if (isCbc) sawCbc = true;
+        return renderTyagiTestSection(group, patientGender, { forceNewPage });
+    }).join('');
     const reportRemarks = report.remarks || '';
     const portraitLogo = isPortraitLogo(lab.logoFile);
     const stackedLogo = portraitLogo && lab.logoLayout === 'stacked';
